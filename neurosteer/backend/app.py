@@ -9,7 +9,7 @@ from flask import Flask, Response, jsonify, request, stream_with_context
 from werkzeug.exceptions import HTTPException
 
 import config
-from eeg_source import Acquisition, electrode_positions
+from eeg_source import SOURCES, Acquisition, electrode_positions
 
 log = logging.getLogger("neurosteer")
 app = Flask(__name__)
@@ -21,6 +21,7 @@ DEFAULTS = {"prefix": 0.8, "prefix_tokens": 6, "bias": 1.0, "residual": 0.3, "hi
             "temperature": 0.7, "max_tokens": 70, "max_sentences": 8}
 LIMITS = {"prefix": (0.0, 3.0), "prefix_tokens": (1, 12), "bias": (0.0, 5.0), "residual": (0.0, 2.0),
           "temperature": (0.05, 2.0), "max_tokens": (8, 200), "max_sentences": (1, 20)}
+MIN_EPOCH_S = 0.1
 PRESETS = {
     "subtle": {"prefix": 0.5, "prefix_tokens": 4, "bias": 0.5, "residual": 0.15, "hint": False},
     "balanced": {"prefix": 0.8, "prefix_tokens": 6, "bias": 1.0, "residual": 0.3, "hint": False},
@@ -149,10 +150,13 @@ def montage():
 @app.post("/api/source")
 def set_source():
     kind = jbody().get("kind", "synthetic")
+    if not isinstance(kind, str) or kind not in SOURCES:
+        return jsonify({"error": f"unknown source {kind!r}", "sources": list(SOURCES)}), 400
     try:
         acq.start(kind)
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        log.warning("source %s failed: %s", kind, e)
+        return jsonify({"error": str(e) or repr(e)}), 400
     return jsonify(acq.status())
 
 
@@ -163,7 +167,7 @@ def eeg_stream():
         tick = 0
         while True:
             buf, src = acq.buffer, acq.source
-            if buf is None:
+            if buf is None or src is None:
                 time.sleep(0.2)
                 continue
             now = buf.total
@@ -197,7 +201,7 @@ def eeg_stream():
 def new_session():
     body = jbody()
     with slock:
-        q = (body.get("question") or body.get("topic") or "").strip() or "Why do we dream?"
+        q = str(body.get("question") or body.get("topic") or "").strip()[:500] or "Why do we dream?"
         session.update({"question": q, "history": [], "read": None, "last_decode": None, "ended": False})
         session["settings"].update(clean_settings(body.get("settings")))
     return jsonify({"question": session["question"], "settings": session["settings"]})
@@ -221,10 +225,12 @@ def presets():
 
 @app.post("/api/read/start")
 def read_start():
-    if acq.buffer is None:
+    buf, src = acq.buffer, acq.source
+    if buf is None or src is None:
         return jsonify({"error": "no EEG source"}), 400
-    session["read"] = {"start": acq.now(), "t0": time.time()}
-    acq.source.reading = True
+    session["read"] = {"start": buf.total, "t0": time.time(), "buf": buf, "src": src,
+                       "id": len(session["history"]) - 1}
+    src.reading = True
     return jsonify({"start": session["read"]["start"]})
 
 
@@ -234,21 +240,24 @@ def read_end():
     if r is None:
         return jsonify({"error": "not reading"}), 400
     session["read"] = None
-    acq.source.reading = False
-    end = acq.now()
-    epoch = acq.buffer.read(r["start"], end)
+    buf, src = r["buf"], r["src"]
+    src.reading = False
+    end = buf.total
+    epoch = buf.read(r["start"], end)
     if models["decoder"] is None:
         return jsonify({"error": "decoder not loaded"}), 503
+    if epoch.shape[1] < src.fs * MIN_EPOCH_S:
+        return jsonify({"error": f"epoch too short ({epoch.shape[1] / src.fs:.2f} s)"}), 400
     t = time.time()
-    d = models["decoder"].decode(epoch, acq.source.fs)
+    d = models["decoder"].decode(epoch, src.fs)
     d.update({"start": r["start"], "end": end, "latency_ms": round((time.time() - t) * 1000),
-              "brain_derived": acq.source.brain_derived, "source": acq.source.label})
+              "brain_derived": src.brain_derived, "source": src.label})
     session["last_decode"] = d
     log.info("decode %.1f s epoch -> %d units in %d ms: %s", d["seconds"], len(d["units"]), d["latency_ms"],
              " ".join(u["word"] for u in d["units"][:6]))
     public = {k: v for k, v in d.items() if k != "slot_vecs"}
-    if session["history"]:
-        session["history"][-1]["decode"] = public
+    if 0 <= r["id"] < len(session["history"]):
+        session["history"][r["id"]]["decode"] = public
     return jsonify(public)
 
 
