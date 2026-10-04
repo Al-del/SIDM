@@ -19,13 +19,17 @@ BANDS = {"delta": (1, 4), "theta": (4, 8), "alpha": (8, 13), "beta": (13, 30), "
 DEFAULTS = {"prefix": 0.8, "prefix_tokens": 6, "bias": 1.0, "residual": 0.3, "hint": False,
             "temperature": 0.7, "max_tokens": 70, "max_sentences": 8}
 
-models = {"decoder": None, "llm": None, "errors": {}, "loading": True}
+models = {"decoder": None, "llm": None, "errors": {}, "loading": True, "mock": config.MOCK}
 session = {"question": "", "history": [], "settings": dict(DEFAULTS), "read": None, "last_decode": None, "ended": False}
 slock = threading.Lock()
 
 
-def load_models():
-    for key, mod, cls in (("decoder", "decoder", "SemanticDecoder"), ("llm", "steering", "Steerer")):
+def load_models(mock=None):
+    mock = config.MOCK if mock is None else mock
+    specs = ((("decoder", "mock_models", "MockDecoder"), ("llm", "mock_models", "MockSteerer")) if mock else
+             (("decoder", "decoder", "SemanticDecoder"), ("llm", "steering", "Steerer")))
+    models.update({"decoder": None, "llm": None, "errors": {}, "loading": True, "mock": mock})
+    for key, mod, cls in specs:
         t = time.time()
         try:
             models[key] = getattr(__import__(mod), cls)()
@@ -57,6 +61,7 @@ def event(name, data):
 def status():
     llm = models["llm"]
     return jsonify({
+        "mock": models["mock"],
         "eeg": acq.status(),
         "decoder": models["decoder"] is not None,
         "llm": llm.info() if llm else None,
