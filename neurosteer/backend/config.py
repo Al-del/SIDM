@@ -21,3 +21,7 @@ N_CHANNELS = 105
 EPOCH_SECONDS = 9
 BUFFER_SECONDS = 120
 PORT = int(os.environ.get("PORT", 5050))
+HOST = os.environ.get("HOST", "127.0.0.1")
+MOCK = os.environ.get("NEUROSTEER_MOCK", "").lower() in ("1", "true", "yes")
+MOCK_DELAY = float(os.environ.get("NEUROSTEER_MOCK_DELAY", 0.04))
+VERSION = "0.2.0"

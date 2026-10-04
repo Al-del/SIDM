@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import threading
@@ -243,10 +244,21 @@ def history():
     return jsonify({"question": session["question"], "history": session["history"]})
 
 
-if __name__ == "__main__":
+def main():
+    ap = argparse.ArgumentParser(description="Neurosteer backend")
+    ap.add_argument("--port", type=int, default=config.PORT)
+    ap.add_argument("--host", default=config.HOST)
+    ap.add_argument("--mock", action="store_true", default=config.MOCK, help="fake decoder and LLM, no weights")
+    args = ap.parse_args()
+    config.MOCK = args.mock
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname).1s %(name)s: %(message)s",
                         datefmt="%H:%M:%S")
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
     acq.start("replay" if config.REPLAY_DIR.exists() else "synthetic")
     threading.Thread(target=load_models, daemon=True).start()
-    app.run(host="127.0.0.1", port=config.PORT, threaded=True)
+    log.info("Neurosteer %s on http://%s:%d%s", config.VERSION, args.host, args.port, " (mock)" if args.mock else "")
+    app.run(host=args.host, port=args.port, threaded=True)
+
+
+if __name__ == "__main__":
+    main()
