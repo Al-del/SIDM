@@ -19,11 +19,39 @@ DISPLAY = [int(i) for i in np.argsort(np.arctan2(POS[:, 1], POS[:, 0]))[:: max(1
 BANDS = {"delta": (1, 4), "theta": (4, 8), "alpha": (8, 13), "beta": (13, 30), "gamma": (30, 45)}
 DEFAULTS = {"prefix": 0.8, "prefix_tokens": 6, "bias": 1.0, "residual": 0.3, "hint": False,
             "temperature": 0.7, "max_tokens": 70, "max_sentences": 8}
+LIMITS = {"prefix": (0.0, 3.0), "prefix_tokens": (1, 12), "bias": (0.0, 5.0), "residual": (0.0, 2.0),
+          "temperature": (0.05, 2.0), "max_tokens": (8, 200), "max_sentences": (1, 20)}
 
 models = {"decoder": None, "llm": None, "errors": {}, "loading": True, "mock": config.MOCK}
 session = {"question": "", "history": [], "settings": dict(DEFAULTS), "read": None, "last_decode": None, "ended": False}
 slock = threading.Lock()
 STARTED = time.time()
+
+
+def jbody():
+    b = request.get_json(silent=True)
+    return b if isinstance(b, dict) else {}
+
+
+def clean_settings(body):
+    out = {}
+    for k, v in (body or {}).items() if isinstance(body, dict) else ():
+        if k not in DEFAULTS:
+            continue
+        try:
+            if isinstance(DEFAULTS[k], bool):
+                v = v.strip().lower() in ("1", "true", "yes", "on") if isinstance(v, str) else bool(v)
+            else:
+                v = type(DEFAULTS[k])(round(float(v)) if isinstance(DEFAULTS[k], int) else float(v))
+                if v != v or v in (float("inf"), float("-inf")):
+                    raise ValueError(v)
+                lo, hi = LIMITS[k]
+                v = min(max(v, lo), hi)
+        except (TypeError, ValueError, OverflowError):
+            log.warning("ignoring setting %s=%r", k, v)
+            continue
+        out[k] = v
+    return out
 
 
 def load_models(mock=None):
@@ -114,7 +142,7 @@ def montage():
 
 @app.post("/api/source")
 def set_source():
-    kind = (request.get_json(silent=True) or {}).get("kind", "synthetic")
+    kind = jbody().get("kind", "synthetic")
     try:
         acq.start(kind)
     except Exception as e:
@@ -161,18 +189,19 @@ def eeg_stream():
 
 @app.post("/api/session")
 def new_session():
-    body = request.get_json(silent=True) or {}
+    body = jbody()
     with slock:
         q = (body.get("question") or body.get("topic") or "").strip() or "Why do we dream?"
         session.update({"question": q, "history": [], "read": None, "last_decode": None, "ended": False})
-        session["settings"].update({k: v for k, v in (body.get("settings") or {}).items() if k in DEFAULTS})
+        session["settings"].update(clean_settings(body.get("settings")))
     return jsonify({"question": session["question"], "settings": session["settings"]})
 
 
 @app.post("/api/settings")
 def settings():
-    body = request.get_json(silent=True) or {}
-    session["settings"].update({k: type(DEFAULTS[k])(v) for k, v in body.items() if k in DEFAULTS})
+    body = jbody()
+    with slock:
+        session["settings"].update(clean_settings(body))
     return jsonify(session["settings"])
 
 
