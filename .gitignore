@@ -1,0 +1,17 @@
+results/
+weights/
+data/
+datasets/
+work/
+runs/
+eval_out/
+retrain_out/
+*.pt
+*.pth
+*.mat
+*.log
+*.json
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
