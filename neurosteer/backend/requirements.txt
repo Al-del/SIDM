@@ -4,3 +4,4 @@ transformers>=5.18
 numpy
 scipy
 pylsl
+mne
