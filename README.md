@@ -72,6 +72,12 @@ which is the same file as `weights/text_assets_qwen3emb8b.pt`.
 
 Data preparation from the raw ZuCo `.mat` files: `prepare_zuco.py` (EEG), `text_assets.py --model Qwen/Qwen3-Embedding-8B` (units).
 
+## Neurosteer app
+
+`neurosteer/` is a closed-loop demo built on this model: ask a question, Qwen3-1.7B answers one sentence at a time,
+the EEG recorded while you read each sentence is decoded by RAG-Mosaic, translated into Qwen's embedding space and
+used to steer the next sentence. Flask backend, Next.js frontend; see `neurosteer/README.md`.
+
 ## Files
 | file | what |
 |---|---|
