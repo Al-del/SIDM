@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import queue
 import threading
 import time
 
@@ -22,6 +23,7 @@ DEFAULTS = {"prefix": 0.8, "prefix_tokens": 6, "bias": 1.0, "residual": 0.3, "hi
 LIMITS = {"prefix": (0.0, 3.0), "prefix_tokens": (1, 12), "bias": (0.0, 5.0), "residual": (0.0, 2.0),
           "temperature": (0.05, 2.0), "max_tokens": (8, 200), "max_sentences": (1, 20)}
 MIN_EPOCH_S = 0.1
+PING_S = 15.0
 PRESETS = {
     "subtle": {"prefix": 0.5, "prefix_tokens": 4, "bias": 0.5, "residual": 0.15, "hint": False},
     "balanced": {"prefix": 0.8, "prefix_tokens": 6, "bias": 1.0, "residual": 0.3, "hint": False},
@@ -30,8 +32,11 @@ PRESETS = {
 }
 
 models = {"decoder": None, "llm": None, "errors": {}, "loading": True, "mock": config.MOCK}
-session = {"question": "", "history": [], "settings": dict(DEFAULTS), "read": None, "last_decode": None, "ended": False}
+session = {"question": "", "history": [], "settings": dict(DEFAULTS), "read": None, "last_decode": None, "ended": False,
+           "sid": 0}
 slock = threading.Lock()
+glock = threading.Lock()
+dlock = threading.Lock()
 STARTED = time.time()
 
 
@@ -202,7 +207,8 @@ def new_session():
     body = jbody()
     with slock:
         q = str(body.get("question") or body.get("topic") or "").strip()[:500] or "Why do we dream?"
-        session.update({"question": q, "history": [], "read": None, "last_decode": None, "ended": False})
+        session.update({"question": q, "history": [], "read": None, "last_decode": None, "ended": False,
+                        "sid": session["sid"] + 1})
         session["settings"].update(clean_settings(body.get("settings")))
     return jsonify({"question": session["question"], "settings": session["settings"]})
 
@@ -236,6 +242,15 @@ def read_start():
 
 @app.post("/api/read/end")
 def read_end():
+    if not dlock.acquire(blocking=False):
+        return jsonify({"error": "a decode is already running"}), 409
+    try:
+        return decode_read()
+    finally:
+        dlock.release()
+
+
+def decode_read():
     r = session["read"]
     if r is None:
         return jsonify({"error": "not reading"}), 400
@@ -270,54 +285,108 @@ def readout():
     return jsonify({"text": llm.readout(d), "ms": round((time.time() - t) * 1000)})
 
 
+def plan_summary(plan, llm):
+    if plan is None:
+        return None
+    strips = None
+    if plan["prefix"] is not None:
+        p = plan["prefix"].float().cpu()
+        p = p.reshape(p.shape[0], 32, -1).mean(-1)
+        strips = [[round(v, 3) for v in row] for row in (p / (p.abs().max() + 1e-6)).tolist()]
+    return {"units": [u["word"] for u in plan["units"]], "weights": [round(w, 3) for w in plan["weights"]],
+            "labels": plan["labels"], "mode": plan["mode"], "prefix": strips, "bias_tokens": len(plan["bias"]),
+            "residual_norm": round(float(plan["residual"].norm()), 2) if plan["residual"] is not None else 0,
+            "layer": llm.layer}
+
+
+def streamed(gen, every=PING_S):
+    q, stop, done = queue.Queue(), threading.Event(), object()
+
+    def pump():
+        try:
+            for item in gen:
+                q.put(item)
+                if stop.is_set():
+                    break
+        except Exception as e:
+            log.exception("stream failed")
+            q.put(event("error", {"error": f"{type(e).__name__}: {e}"}))
+        finally:
+            gen.close()
+            q.put(done)
+
+    threading.Thread(target=pump, daemon=True).start()
+
+    def out():
+        try:
+            while True:
+                try:
+                    item = q.get(timeout=every)
+                except queue.Empty:
+                    yield ": ping\n\n"
+                    continue
+                if item is done:
+                    return
+                yield item
+        finally:
+            stop.set()
+
+    return sse(out())
+
+
+def exclusive(gen):
+    if not glock.acquire(blocking=False):
+        return jsonify({"error": "a generation is already running"}), 409
+
+    def run():
+        try:
+            yield from gen
+        finally:
+            glock.release()
+
+    return streamed(run())
+
+
 @app.get("/api/generate")
 def generate():
     llm = models["llm"]
     if llm is None:
         return jsonify({"error": "LLM not loaded"}), 503
+    if not session["question"]:
+        return jsonify({"error": "no session: POST /api/session first"}), 400
     s = dict(session["settings"])
     if request.args.get("steer") == "0":
         s.update({"prefix": 0, "bias": 0, "residual": 0, "hint": False})
+    sid, question, d = session["sid"], session["question"], session["last_decode"]
+    history = [h["sentence"] for h in session["history"]]
 
     def gen():
-        d = session["last_decode"]
         t0 = time.time()
         plan = llm.plan(d, s) if d else None
-        summary = None
-        if plan is not None:
-            pre = plan["prefix"]
-            strips = None
-            if pre is not None:
-                p = pre.float().cpu()
-                p = p.reshape(p.shape[0], 32, -1).mean(-1)
-                strips = (p / (p.abs().max() + 1e-6)).round(decimals=3).tolist()
-            summary = {"units": [u["word"] for u in plan["units"]], "weights": [round(w, 3) for w in plan["weights"]],
-                       "labels": plan["labels"], "mode": plan["mode"],
-                       "prefix": strips, "bias_tokens": len(plan["bias"]),
-                       "residual_norm": round(float(plan["residual"].norm()), 2) if plan["residual"] is not None else 0,
-                       "layer": llm.layer}
+        summary = plan_summary(plan, llm)
         yield event("plan", summary)
         tokens = []
-        history = [h["sentence"] for h in session["history"]]
-        for item in llm.generate(session["question"], history, plan, s):
-            if item.get("done"):
-                end = item["end"] or len(session["history"]) + 1 >= s["max_sentences"]
-                rec = {"id": len(session["history"]), "sentence": item["sentence"], "tokens": tokens,
-                       "plan": summary, "decode": None, "ms": round((time.time() - t0) * 1000), "end": end,
-                       "p_complete": item.get("p_complete", 0.0)}
-                if item["end"]:
-                    rec["tokens"], rec["sentence"] = [], ""
-                else:
-                    session["history"].append(rec)
-                session["ended"] = end
-                log.info("sentence %d in %d ms (%d tokens, %d steered)%s", rec["id"], rec["ms"], len(tokens),
-                         sum(t["steered"] for t in tokens), " [end]" if end else "")
-                yield event("done", rec)
-            else:
+        for item in llm.generate(question, history, plan, s):
+            if not item.get("done"):
                 tokens.append(item)
                 yield event("token", item)
+                continue
+            end = item["end"] or len(history) + 1 >= s["max_sentences"]
+            rec = {"id": len(history), "sentence": item["sentence"], "tokens": tokens, "plan": summary,
+                   "decode": None, "ms": round((time.time() - t0) * 1000), "end": end,
+                   "p_complete": item.get("p_complete", 0.0), "at": time.time()}
+            if item["end"]:
+                rec["tokens"], rec["sentence"] = [], ""
+            with slock:
+                if session["sid"] == sid:
+                    if not item["end"]:
+                        session["history"].append(rec)
+                    session["ended"] = end
+            log.info("sentence %d in %d ms (%d tokens, %d steered)%s", rec["id"], rec["ms"], len(tokens),
+                     sum(t["steered"] for t in tokens), " [end]" if end else "")
+            yield event("done", rec)
 
-    return sse(gen())
+    return exclusive(gen())
 
 
 @app.get("/api/history")
