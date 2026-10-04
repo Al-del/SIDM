@@ -22,6 +22,7 @@ DEFAULTS = {"prefix": 0.8, "prefix_tokens": 6, "bias": 1.0, "residual": 0.3, "hi
 models = {"decoder": None, "llm": None, "errors": {}, "loading": True, "mock": config.MOCK}
 session = {"question": "", "history": [], "settings": dict(DEFAULTS), "read": None, "last_decode": None, "ended": False}
 slock = threading.Lock()
+STARTED = time.time()
 
 
 def load_models(mock=None):
@@ -55,6 +56,11 @@ def sse(gen):
 
 def event(name, data):
     return f"event: {name}\ndata: {json.dumps(data)}\n\n"
+
+
+@app.get("/api/health")
+def health():
+    return jsonify({"ok": True, "uptime_s": round(time.time() - STARTED, 1), "version": config.VERSION})
 
 
 @app.get("/api/status")
