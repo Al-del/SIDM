@@ -51,14 +51,41 @@ class Source:
     kind = "base"
     label = ""
     brain_derived = False
+    live = False
 
     def __init__(self):
         self.fs = config.FS
         self.channels = config.N_CHANNELS
         self.reading = False
+        self.display = None
+        self.info = {}
 
     def pull(self, n):
         raise NotImplementedError
+
+    def close(self):
+        pass
+
+
+class HeadsetSource(Source):
+
+    live = True
+    brain_derived = True
+
+    def _setup(self, labels, fs):
+        from montage import ChannelMapper, OnlineFilter
+
+        self.fs = int(fs)
+        self.mapper = ChannelMapper(labels)
+        self.filter = OnlineFilter(len(labels), self.fs)
+        m = self.mapper.describe()
+        self.display = list(zip(m["sensors"], m["measured"]))
+        self.info = {"headset_channels": m["measured"], "unknown_labels": m["unknown"], "sensors": m["sensors"]}
+
+    def _emit(self, x):
+        if x.shape[1] == 0:
+            return np.zeros((self.channels, 0), dtype=np.float32)
+        return self.mapper(self.filter(x))
 
 
 class SyntheticSource(Source):
@@ -118,9 +145,8 @@ class ReplaySource(Source):
         return self.signal[:, idx]
 
 
-class LSLSource(Source):
+class LSLSource(HeadsetSource):
     kind = "lsl"
-    brain_derived = True
 
     def __init__(self):
         super().__init__()
@@ -131,30 +157,50 @@ class LSLSource(Source):
             raise RuntimeError("no LSL stream of type EEG found")
         self.inlet = StreamInlet(streams[0], max_chunklen=64)
         info = self.inlet.info()
-        self.fs = int(round(info.nominal_srate()))
-        labels, _ = electrode_positions()
         names = []
         ch = info.desc().child("channels").child("channel")
-        for _ in range(info.channel_count()):
-            names.append(ch.child_value("label"))
+        for i in range(info.channel_count()):
+            names.append(ch.child_value("label") or f"ch{i}")
             ch = ch.next_sibling()
-        where = {n: i for i, n in enumerate(names)}
-        self.map = [(j, where[l]) for j, l in enumerate(labels) if l in where]
-        self.coverage = len(self.map) / config.N_CHANNELS
-        self.label = f"LSL · {info.name()} · {info.channel_count()}CH · {self.coverage:.0%} MAPPED"
+        self._setup(names, round(info.nominal_srate()))
+        self.label = f"LSL · {info.name()} · {len(self.display)}/{info.channel_count()} CH PLACED"
 
     def pull(self, n):
-        chunk, _ = self.inlet.pull_chunk(timeout=0.0, max_samples=n * 4)
+        chunk, _ = self.inlet.pull_chunk(timeout=0.0, max_samples=4096)
         if not chunk:
             return np.zeros((self.channels, 0), dtype=np.float32)
-        x = np.asarray(chunk, dtype=np.float32).T
-        out = np.zeros((self.channels, x.shape[1]), dtype=np.float32)
-        for j, i in self.map:
-            out[j] = x[i]
-        return out
+        return self._emit(np.asarray(chunk, dtype=np.float32).T)
+
+    def close(self):
+        self.inlet.close_stream()
 
 
-SOURCES = {"synthetic": SyntheticSource, "replay": ReplaySource, "lsl": LSLSource}
+class BrainAccessSource(HeadsetSource):
+    kind = "brainaccess"
+
+    def __init__(self):
+        super().__init__()
+        from brainaccess_source import BrainAccessDevice
+
+        self.dev = BrainAccessDevice()
+        try:
+            self._setup(self.dev.labels, self.dev.fs)
+            self.dev.start()
+        except Exception:
+            self.dev.close()
+            raise
+        self.info.update({"model": self.dev.model, "serial": self.dev.serial, "port": self.dev.port,
+                          "battery": self.dev.battery()})
+        self.label = f"BRAINACCESS {self.dev.model} · {len(self.dev.labels)}CH · {self.dev.port}"
+
+    def pull(self, n):
+        return self._emit(self.dev.read())
+
+    def close(self):
+        self.dev.close()
+
+
+SOURCES = {"synthetic": SyntheticSource, "replay": ReplaySource, "lsl": LSLSource, "brainaccess": BrainAccessSource}
 
 
 class Acquisition:
@@ -167,8 +213,8 @@ class Acquisition:
 
     def start(self, kind):
         with self.lock:
-            self.stop()
             src = SOURCES[kind]()
+            self.stop()
             self.source = src
             self.buffer = RingBuffer(src.channels, src.fs, config.BUFFER_SECONDS)
             self.running = True
@@ -180,12 +226,20 @@ class Acquisition:
         if self.thread is not None:
             self.thread.join(timeout=1)
         self.thread = None
+        if self.source is not None:
+            self.source.close()
 
     def _loop(self):
         src, buf = self.source, self.buffer
         step = max(1, src.fs // 25)
         t_next = time.perf_counter()
         while self.running:
+            if src.live:
+                chunk = src.pull(0)
+                if chunk.shape[1]:
+                    buf.write(chunk)
+                time.sleep(0.02)
+                continue
             chunk = src.pull(step)
             if chunk.shape[1]:
                 buf.write(chunk)
@@ -204,4 +258,4 @@ class Acquisition:
         if s is None:
             return {"kind": None}
         return {"kind": s.kind, "label": s.label, "fs": s.fs, "channels": s.channels,
-                "brain_derived": s.brain_derived}
+                "brain_derived": s.brain_derived, "live": s.live, **s.info}
