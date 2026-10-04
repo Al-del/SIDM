@@ -1,7 +1,7 @@
 import json
+import logging
 import threading
 import time
-import traceback
 
 import numpy as np
 from flask import Flask, Response, jsonify, request, stream_with_context
@@ -9,6 +9,7 @@ from flask import Flask, Response, jsonify, request, stream_with_context
 import config
 from eeg_source import Acquisition, electrode_positions
 
+log = logging.getLogger("neurosteer")
 app = Flask(__name__)
 acq = Acquisition()
 LABELS, POS = electrode_positions()
@@ -23,18 +24,14 @@ slock = threading.Lock()
 
 
 def load_models():
-    try:
-        from decoder import SemanticDecoder
-        models["decoder"] = SemanticDecoder()
-    except Exception as e:
-        models["errors"]["decoder"] = repr(e)
-        traceback.print_exc()
-    try:
-        from steering import Steerer
-        models["llm"] = Steerer()
-    except Exception as e:
-        models["errors"]["llm"] = repr(e)
-        traceback.print_exc()
+    for key, mod, cls in (("decoder", "decoder", "SemanticDecoder"), ("llm", "steering", "Steerer")):
+        t = time.time()
+        try:
+            models[key] = getattr(__import__(mod), cls)()
+            log.info("%s ready in %.1f s", cls, time.time() - t)
+        except Exception as e:
+            models["errors"][key] = repr(e)
+            log.exception("%s failed to load", cls)
     models["loading"] = False
 
 
@@ -174,6 +171,8 @@ def read_end():
     d.update({"start": r["start"], "end": end, "latency_ms": round((time.time() - t) * 1000),
               "brain_derived": acq.source.brain_derived, "source": acq.source.label})
     session["last_decode"] = d
+    log.info("decode %.1f s epoch -> %d units in %d ms: %s", d["seconds"], len(d["units"]), d["latency_ms"],
+             " ".join(u["word"] for u in d["units"][:6]))
     public = {k: v for k, v in d.items() if k != "slot_vecs"}
     if session["history"]:
         session["history"][-1]["decode"] = public
@@ -229,6 +228,8 @@ def generate():
                 else:
                     session["history"].append(rec)
                 session["ended"] = end
+                log.info("sentence %d in %d ms (%d tokens, %d steered)%s", rec["id"], rec["ms"], len(tokens),
+                         sum(t["steered"] for t in tokens), " [end]" if end else "")
                 yield event("done", rec)
             else:
                 tokens.append(item)
@@ -243,6 +244,9 @@ def history():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname).1s %(name)s: %(message)s",
+                        datefmt="%H:%M:%S")
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
     acq.start("replay" if config.REPLAY_DIR.exists() else "synthetic")
     threading.Thread(target=load_models, daemon=True).start()
     app.run(host="127.0.0.1", port=config.PORT, threaded=True)
