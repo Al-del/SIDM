@@ -87,3 +87,96 @@ class MockDecoder:
 
     def info(self):
         return {"name": "mock-decoder (band power -> words)", "dim": self.dim, "mock": True}
+
+
+TEMPLATES = [
+    [("When it comes to {topic}, the key is how the brain organises {w} over time.", "information"),
+     ("The short answer about {topic} is that the brain is quietly reworking {w}.", "experience")],
+    [("Researchers think {w} plays a central role, because it links memory with emotion.", "attention"),
+     ("One leading idea is that {w} acts as a bridge between what we notice and what we keep.", "context")],
+    [("During this process, neurons replay recent patterns and strengthen the ones tied to {w}.", "learning"),
+     ("Networks in the cortex rehearse the day, and traces linked to {w} tend to survive.", "practice")],
+    [("This also explains why {w} can feel vivid even when nothing external is happening.", "imagery"),
+     ("That is why {w} often shapes {topic} more than any single event does.", "mood")],
+    [("In short, {topic} is the mind's way of turning {w} into something it can keep.", "noise"),
+     ("So {topic} is less a mystery than a routine maintenance job on {w}.", "memory")],
+]
+
+
+class MockSteerer:
+
+    mock = True
+    layer = 14
+    hidden = 2048
+
+    def info(self):
+        return {"name": "mock-qwen (no weights)", "layers": 28, "hidden": self.hidden, "steer_layer": self.layer,
+                "device": "cpu", "translator": False, "mock": True}
+
+    @staticmethod
+    def token_id(word):
+        return seed_of(word.lower()) % 151000
+
+    def plan(self, decode, s):
+        import torch
+
+        units = decode["units"][: s["prefix_tokens"]]
+        if not units:
+            return None
+        w = torch.tensor([u["weight"] for u in units])
+        w = w / w.max()
+        g = torch.Generator().manual_seed(seed_of(*(u["word"] for u in units)))
+        plan = {"units": units, "weights": w.tolist(), "prefix": None, "labels": [], "bias": {}, "residual": None,
+                "mode": "mock"}
+        if s["prefix"] > 0:
+            plan["prefix"] = torch.randn(len(units), self.hidden, generator=g) * w[:, None] * s["prefix"]
+            plan["labels"] = [u["word"] for u in units]
+        if s["residual"] > 0:
+            plan["residual"] = torch.nn.functional.normalize(torch.randn(self.hidden, generator=g), dim=0) * 40 * s["residual"]
+        if s["bias"] > 0:
+            for u, wi in zip(units, w.tolist()):
+                plan["bias"][self.token_id(u["word"])] = s["bias"] * wi
+        return plan
+
+    def readout(self, decode):
+        ws = [u["word"] for u in decode.get("units", [])[:3]]
+        return f"Something about {' and '.join(ws)}." if ws else None
+
+    @staticmethod
+    def topic(question):
+        from textutil import content_words
+
+        ws = content_words(question)
+        return " ".join(ws[-2:]) if ws else "this question"
+
+    def _sentence(self, question, history, plan, s):
+        from textutil import stems
+
+        i = min(len(history), len(TEMPLATES) - 1)
+        rng = np.random.default_rng(seed_of(question, len(history), s["temperature"]))
+        variants = TEMPLATES[i]
+        text, default = variants[int(rng.integers(len(variants)))] if s["temperature"] > 0.3 else variants[0]
+        steer, used = None, stems(" ".join(history))
+        if plan is not None and (plan["prefix"] is not None or plan["bias"] or plan["residual"] is not None):
+            fresh = [u["word"] for u in plan["units"] if u["word"] not in used]
+            steer = (fresh or [u["word"] for u in plan["units"]])[0]
+        return text.format(topic=self.topic(question), w=steer or default), steer
+
+    def generate(self, question, history, plan, s):
+        import time
+
+        p_done = 0.0 if len(history) < 3 else round(0.35 + 0.15 * (len(history) - 3), 3)
+        if p_done > 0.5:
+            yield {"done": True, "sentence": "", "end": True, "p_complete": p_done}
+            return
+        sentence, steer = self._sentence(question, history, plan, s)
+        bias = plan["bias"] if plan is not None else {}
+        out = []
+        for i, word in enumerate(sentence.split()[: s["max_tokens"]]):
+            key = word.strip(".,;:!?'\"").lower()
+            b = bias.get(self.token_id(key), 0.0) if key == (steer or "").lower() else 0.0
+            text = (" " if i else "") + word
+            out.append(text)
+            time.sleep(config.MOCK_DELAY)
+            yield {"text": text, "steered": b > 0, "bias": round(b, 3)}
+        yield {"done": True, "sentence": "".join(out).strip(), "end": False, "p_complete": p_done}
