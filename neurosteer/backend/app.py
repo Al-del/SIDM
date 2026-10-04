@@ -21,6 +21,12 @@ DEFAULTS = {"prefix": 0.8, "prefix_tokens": 6, "bias": 1.0, "residual": 0.3, "hi
             "temperature": 0.7, "max_tokens": 70, "max_sentences": 8}
 LIMITS = {"prefix": (0.0, 3.0), "prefix_tokens": (1, 12), "bias": (0.0, 5.0), "residual": (0.0, 2.0),
           "temperature": (0.05, 2.0), "max_tokens": (8, 200), "max_sentences": (1, 20)}
+PRESETS = {
+    "subtle": {"prefix": 0.5, "prefix_tokens": 4, "bias": 0.5, "residual": 0.15, "hint": False},
+    "balanced": {"prefix": 0.8, "prefix_tokens": 6, "bias": 1.0, "residual": 0.3, "hint": False},
+    "strong": {"prefix": 1.2, "prefix_tokens": 8, "bias": 2.0, "residual": 0.7, "hint": False},
+    "off": {"prefix": 0.0, "bias": 0.0, "residual": 0.0, "hint": False},
+}
 
 models = {"decoder": None, "llm": None, "errors": {}, "loading": True, "mock": config.MOCK}
 session = {"question": "", "history": [], "settings": dict(DEFAULTS), "read": None, "last_decode": None, "ended": False}
@@ -200,9 +206,17 @@ def new_session():
 @app.post("/api/settings")
 def settings():
     body = jbody()
+    preset = body.pop("preset", None)
+    if preset is not None and (not isinstance(preset, str) or preset not in PRESETS):
+        return jsonify({"error": f"unknown preset {preset!r}", "presets": list(PRESETS)}), 400
     with slock:
-        session["settings"].update(clean_settings(body))
+        session["settings"].update({**(PRESETS[preset] if preset else {}), **clean_settings(body)})
     return jsonify(session["settings"])
+
+
+@app.get("/api/presets")
+def presets():
+    return jsonify(PRESETS)
 
 
 @app.post("/api/read/start")
