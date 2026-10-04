@@ -70,10 +70,19 @@ def status():
     })
 
 
+def display():
+    src = acq.source
+    if src is not None and src.display:
+        return [i for i, _ in src.display], [l for _, l in src.display]
+    return DISPLAY, [LABELS[i] for i in DISPLAY]
+
+
 @app.get("/api/montage")
 def montage():
-    return jsonify({"labels": LABELS, "pos": POS.round(4).tolist(), "display": DISPLAY,
-                    "display_labels": [LABELS[i] for i in DISPLAY]})
+    idx, names = display()
+    sensors = acq.source.info.get("sensors", []) if acq.source is not None else []
+    return jsonify({"labels": LABELS, "pos": POS.round(4).tolist(), "display": idx,
+                    "display_labels": names, "sensors": sensors})
 
 
 @app.post("/api/source")
@@ -103,7 +112,7 @@ def eeg_stream():
             last = now
             dec = max(1, src.fs // 125)
             frame = {"t": now, "fs": src.fs / dec,
-                     "samples": np.round(x[DISPLAY, ::dec], 3).tolist(),
+                     "samples": np.round(x[display()[0], ::dec], 3).tolist(),
                      "reading": session["read"] is not None}
             yield event("eeg", frame)
             tick += 1
