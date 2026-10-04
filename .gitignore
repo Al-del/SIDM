@@ -15,3 +15,11 @@ __pycache__/
 *.pyc
 .venv/
 .DS_Store
+!neurosteer/frontend/package.json
+!neurosteer/frontend/package-lock.json
+!neurosteer/frontend/tsconfig.json
+.env*
+.next/
+next-env.d.ts
+*.tsbuildinfo
+neurosteer/backend/weights/
