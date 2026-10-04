@@ -1,4 +1,5 @@
 import json
+import logging
 import threading
 import time
 
@@ -6,6 +7,8 @@ import numpy as np
 import torch
 
 import config
+
+log = logging.getLogger("neurosteer.eeg")
 
 
 class RingBuffer:
@@ -36,7 +39,17 @@ class RingBuffer:
         return self.read(self.total - n, self.total)
 
 
+def generic_positions(n=config.N_CHANNELS):
+    i = np.arange(n) + 0.5
+    r = np.sqrt(i / n) * 0.95
+    a = i * np.pi * (3 - np.sqrt(5))
+    return [f"E{k + 1}" for k in range(n)], np.stack([r * np.sin(a), r * np.cos(a)], 1)
+
+
 def electrode_positions():
+    if not config.CHANLOCS.exists():
+        log.warning("%s missing: using a generic %d-channel layout", config.CHANLOCS, config.N_CHANNELS)
+        return generic_positions()
     locs = json.load(open(config.CHANLOCS))
     xyz = np.array([[c["X"], c["Y"], c["Z"]] for c in locs], dtype=np.float64)
     xyz /= np.linalg.norm(xyz, axis=1, keepdims=True)
