@@ -6,6 +6,7 @@ import time
 
 import numpy as np
 from flask import Flask, Response, jsonify, request, stream_with_context
+from werkzeug.exceptions import HTTPException
 
 import config
 from eeg_source import Acquisition, electrode_positions
@@ -39,6 +40,23 @@ def load_models(mock=None):
             models["errors"][key] = repr(e)
             log.exception("%s failed to load", cls)
     models["loading"] = False
+
+
+@app.before_request
+def preflight():
+    if request.method == "OPTIONS":
+        return "", 204
+
+
+@app.errorhandler(HTTPException)
+def http_error(e):
+    return jsonify({"error": e.description, "status": e.code}), e.code
+
+
+@app.errorhandler(Exception)
+def server_error(e):
+    log.exception("unhandled error on %s %s", request.method, request.path)
+    return jsonify({"error": f"{type(e).__name__}: {e}", "status": 500}), 500
 
 
 @app.after_request
