@@ -149,6 +149,34 @@ def test_reset_keeps_settings(client):
     assert client.get("/api/stats").get_json()["sentences"] == 0
 
 
+def test_stream_pings_and_cleans_up(server):
+    import threading
+    import time
+
+    closed = threading.Event()
+
+    def slow():
+        try:
+            yield server.event("a", 1)
+            time.sleep(0.25)
+            yield server.event("b", 2)
+            yield server.event("c", 3)
+        finally:
+            closed.set()
+
+    with server.app.test_request_context():
+        body = "".join(server.streamed(slow(), every=0.05).response)
+    assert ": ping" in body and body.index("event: a") < body.index(": ping") < body.index("event: b")
+    assert closed.wait(1)
+
+    closed.clear()
+    with server.app.test_request_context():
+        it = iter(server.streamed(slow(), every=0.05).response)
+        assert next(it).startswith("event: a")
+        it.close()
+    assert closed.wait(1)
+
+
 def test_short_epoch_is_rejected(client):
     client.post("/api/read/start")
     r = client.post("/api/read/end")
