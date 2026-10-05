@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ElectrodeArray from "@/components/ElectrodeArray";
 import Raster from "@/components/Raster";
 import SemanticPanel from "@/components/SemanticPanel";
-import Logo from "@/components/Logo";
+import TopBar from "@/components/TopBar";
 import Boot from "@/components/Boot";
 import { API, get, post } from "@/lib/api";
 import type { Decode, Entry, Montage, Plan, Settings, Status, Token } from "@/lib/api";
@@ -33,7 +33,6 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [t0, setT0] = useState<number | null>(null);
   const [switching, setSwitching] = useState<string | null>(null);
-  const [clock, setClock] = useState(0);
 
   const phaseRef = useRef<Phase>("idle");
   const autoRef = useRef(auto);
@@ -64,12 +63,6 @@ export default function Page() {
     const id = setInterval(poll, 2000);
     return () => { alive = false; clearInterval(id); };
   }, []);
-
-  useEffect(() => {
-    if (t0 === null) return;
-    const id = setInterval(() => setClock(Date.now() - t0), 250);
-    return () => clearInterval(id);
-  }, [t0]);
 
   const endReading = useCallback(async () => {
     if (phaseRef.current !== "reading") return;
@@ -205,38 +198,12 @@ export default function Page() {
     GENERATE: phase === "generating" && !injecting,
   };
   const eeg = status?.eeg;
-  const mmss = (ms: number) => {
-    const s = Math.floor(ms / 1000);
-    return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}.${Math.floor((ms % 1000) / 100)}`;
-  };
 
   return (
     <div className="shell">
       <Boot status={status} error={error && !status ? error : null} hidden={ready} />
 
-      <header className="topbar">
-        <div className="brand">
-          <Logo />
-          <span className="brand-name">NEUROSTEER</span>
-          <span className="brand-sub mono">EEG → QWEN / CLOSED LOOP</span>
-        </div>
-        <nav className="pipeline">
-          {(["READ", "DECODE", "INJECT", "GENERATE"] as const).map((s, i) => (
-            <div key={s} style={{ display: "flex", alignItems: "center" }}>
-              {i > 0 && <span className={`wire ${stageOn[s] ? "live" : ""}`} />}
-              <span className={`stage ${stageOn[s] ? "on" : ""} ${s === "INJECT" || s === "READ" ? "inj" : ""}`}>
-                <span className="pip" />{s}
-              </span>
-            </div>
-          ))}
-        </nav>
-        <div className="links">
-          <span className="link"><span className={`dot ${connected ? "ok" : "err"}`} />EEG</span>
-          <span className="link"><span className={`dot ${status?.decoder ? "ok" : status?.errors.decoder ? "err" : "wait"}`} />DECODER</span>
-          <span className="link"><span className={`dot ${status?.llm ? "ok" : status?.errors.llm ? "err" : "wait"}`} />QWEN</span>
-          <span className="clock num">T+{mmss(clock)}</span>
-        </div>
-      </header>
+      <TopBar stageOn={stageOn} connected={connected} status={status} t0={t0} />
 
       <main className="main">
         <aside className="col">
@@ -331,13 +298,13 @@ export default function Page() {
                   {phase === "complete" && (
                     <div className="actions">
                       <span className="label" style={{ color: "var(--signal)" }}>Answer complete · {entries.length} sentences</span>
-                      <button className="btn primary" onClick={() => { setT0(null); setClock(0); go("idle"); }}>Ask another</button>
+                      <button className="btn primary" onClick={() => { setT0(null); go("idle"); }}>Ask another</button>
                     </div>
                   )}
                   {phase === "ready" && (
                     <div className="actions">
                       <button className="btn primary" onClick={generate}>Next sentence</button>
-                      <button className="btn ghost" onClick={() => { setT0(null); setClock(0); go("idle"); }}>New session</button>
+                      <button className="btn ghost" onClick={() => { setT0(null); go("idle"); }}>New session</button>
                     </div>
                   )}
                   {(phase === "reading" || phase === "generating") && (
