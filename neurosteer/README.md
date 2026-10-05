@@ -109,7 +109,9 @@ against SYNTH before drawing conclusions.
 ## API
 
 All endpoints return JSON; errors are `{"error": ..., "status": code}` with a matching HTTP status.
-SSE streams send a `: ping` comment every 15 s while idle.
+SSE streams send a `: ping` comment every 15 s while idle. If the model fails mid-stream, `generate` and
+`compare` send an `error` event (`{"error"}`) and close; EventSource reports it through `onerror`, so close
+the stream there to stop it reconnecting.
 
 | endpoint | what |
 |---|---|
