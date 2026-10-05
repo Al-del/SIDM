@@ -45,6 +45,18 @@ const SLIDERS: { key: keyof Settings; name: string; min: number; max: number; st
   { key: "max_sentences", name: "Max sentences", min: 2, max: 16, step: 1, hint: "answer length" },
 ];
 
+function Toggle({ name, hint, on, onChange, first, last }: {
+  name: string; hint: string; on: boolean; onChange: (v: boolean) => void; first?: boolean; last?: boolean;
+}) {
+  return (
+    <button type="button" role="switch" aria-checked={on} className="toggle" title={hint} onClick={() => onChange(!on)}
+      style={{ ...(first ? { borderTop: 0 } : {}), ...(last ? { marginBottom: 16 } : {}) }}>
+      <span className="label" style={{ color: "var(--text)" }}>{name}</span>
+      <span className={`switch ${on ? "on" : ""}`} aria-hidden />
+    </button>
+  );
+}
+
 export default function SemanticPanel({ readout, decode, plan, settings, steer, auto, onSetting, onSteer, onAuto, presets, onPreset }: Props) {
   const maxW = decode?.units[0]?.weight || 1;
   const preset = presets && settings ? activePreset(presets, settings) : null;
@@ -119,22 +131,16 @@ export default function SemanticPanel({ readout, decode, plan, settings, steer, 
             ))}
           </div>
         )}
-        <div className="toggle" onClick={() => onSteer(!steer)} style={{ borderTop: 0 }}>
-          <span className="label" style={{ color: "var(--text)" }}>Neural steering</span>
-          <span className={`switch ${steer ? "on" : ""}`} />
-        </div>
-        <div className="toggle" onClick={() => onAuto(!auto)}>
-          <span className="label" style={{ color: "var(--text)" }}>Closed loop</span>
-          <span className={`switch ${auto ? "on" : ""}`} />
-        </div>
-        <div className="toggle" onClick={() => settings && onSetting("hint", !settings.hint)} style={{ marginBottom: 16 }}>
-          <span className="label" style={{ color: "var(--text)" }}>Text hint in prompt</span>
-          <span className={`switch ${settings?.hint ? "on" : ""}`} />
-        </div>
+        <Toggle name="Neural steering" on={steer} onChange={onSteer} first
+          hint="Off: the next sentences are generated without any EEG-derived input" />
+        <Toggle name="Closed loop" on={auto} onChange={onAuto}
+          hint="On: generate the next sentence automatically after each decode" />
+        <Toggle name="Text hint in prompt" on={!!settings?.hint} onChange={(v) => settings && onSetting("hint", v)} last
+          hint="Also list the decoded words in the prompt text: strongest, but least neural" />
         {settings && SLIDERS.map((s) => (
           <div className="ctrl" key={s.key} style={{ opacity: steer || s.key === "temperature" || s.key === "max_sentences" ? 1 : 0.35 }}>
             <span className="label"><span style={{ color: "var(--text)" }}>{s.name}</span><span>{s.hint}</span></span>
-            <input type="range" min={s.min} max={s.max} step={s.step} value={settings[s.key] as number}
+            <input type="range" aria-label={s.name} min={s.min} max={s.max} step={s.step} value={settings[s.key] as number}
               onChange={(e) => onSetting(s.key, Number(e.target.value))} />
             <output className="num">{Number(settings[s.key]).toFixed(s.step < 1 ? 2 : 0)}</output>
           </div>

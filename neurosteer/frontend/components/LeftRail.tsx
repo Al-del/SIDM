@@ -31,7 +31,7 @@ export default function LeftRail({ montage, metrics, reading, eeg, decode, switc
       </div>
       <div className="section">
         <div className="section-head"><span className="label">Relative band power</span></div>
-        <div className="bands">
+        <div className="bands" role="img" aria-label={`Relative band power: ${BANDS.map((b) => `${b} ${Math.round((metrics?.bands[b] ?? 0) * 100)}%`).join(", ")}`}>
           {BANDS.map((b) => (
             <div className="band" key={b}>
               <div className="band-bar" style={{ height: `${Math.max(3, (metrics?.bands[b] ?? 0) * 140)}%` }} />
@@ -42,9 +42,9 @@ export default function LeftRail({ montage, metrics, reading, eeg, decode, switc
       </div>
       <div className="section">
         <div className="section-head"><span className="label">Signal source</span></div>
-        <div className="seg">
+        <div className="seg" role="group" aria-label="Signal source">
           {SOURCES.map(([k, n]) => (
-            <button key={k} className={`${eeg?.kind === k ? "on" : ""} ${switching === k ? "busy" : ""}`}
+            <button key={k} aria-pressed={eeg?.kind === k} className={`${eeg?.kind === k ? "on" : ""} ${switching === k ? "busy" : ""}`}
               disabled={!!switching} onClick={() => onSource(k)}>{switching === k ? "LINKING" : n}</button>
           ))}
         </div>

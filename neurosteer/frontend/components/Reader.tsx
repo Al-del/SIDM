@@ -20,6 +20,15 @@ type Props = {
   onStop: () => void;
 };
 
+const PHASE_SAY: Record<Phase, string> = {
+  idle: "",
+  generating: "Qwen is writing the next sentence",
+  reading: "Read the sentence, then press space",
+  decoding: "Decoding the EEG epoch",
+  ready: "Paused",
+  complete: "Answer complete",
+};
+
 const EXAMPLES = [
   "Why do we dream?",
   "How do bees find their way home?",
@@ -30,7 +39,8 @@ const EXAMPLES = [
 export default function Reader(p: Props) {
   const { phase, tokens, count } = p;
   return (
-    <div className="stagebox">
+    <section className="stagebox" aria-label="Reader">
+      <span className="sr-only" aria-live="polite">{PHASE_SAY[phase]}</span>
       <span className="corner tl" /><span className="corner tr" /><span className="corner bl" /><span className="corner br" />
       <div className="stage-meta">
         <span className="label num">{count ? `SENTENCE ${String(count + (phase === "generating" ? 1 : 0)).padStart(2, "0")}` : "SESSION"}</span>
@@ -96,6 +106,6 @@ export default function Reader(p: Props) {
           </div>
         </>
       )}
-    </div>
+    </section>
   );
 }
