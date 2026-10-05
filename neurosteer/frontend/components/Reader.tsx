@@ -19,6 +19,13 @@ type Props = {
   onStop: () => void;
 };
 
+const EXAMPLES = [
+  "Why do we dream?",
+  "How do bees find their way home?",
+  "What makes a melody sound sad?",
+  "Why is the ocean salty?",
+];
+
 export default function Reader(p: Props) {
   const { phase, tokens, count } = p;
   return (
@@ -33,14 +40,25 @@ export default function Reader(p: Props) {
         <div className="start">
           <h1>Ask anything.<br /><em>It answers as you read.</em></h1>
           <div className="field">
-            <span className="label">Question</span>
-            <input value={p.question} onChange={(e) => p.onQuestion(e.target.value)} placeholder="Ask a question"
+            <label className="label" htmlFor="question">Question</label>
+            <input id="question" value={p.question} onChange={(e) => p.onQuestion(e.target.value)} placeholder="Ask a question"
+              autoComplete="off" spellCheck={false}
               onKeyDown={(e) => e.key === "Enter" && p.ready && p.question.trim() && p.onStart()} />
+          </div>
+          <div className="examples" aria-label="Example questions">
+            {EXAMPLES.map((q) => (
+              <button key={q} className={`example ${p.question === q ? "on" : ""}`} onClick={() => p.onQuestion(q)}>{q}</button>
+            ))}
           </div>
           <div className="actions">
             <button className="btn primary" disabled={!p.ready || !p.question.trim()} onClick={p.onStart}>Ask</button>
-            <span className="label">One sentence at a time · SPACE when read</span>
+            <span className="label">{p.ready ? "Enter to ask · SPACE when you've read a sentence" : "Waiting for the models to load…"}</span>
           </div>
+          <ol className="howto">
+            <li><span className="num">01</span><b>Read</b> each sentence as it appears while EEG records</li>
+            <li><span className="num">02</span><b>Decode</b> the epoch into semantic vectors</li>
+            <li><span className="num">03</span><b>Steer</b> Qwen&apos;s next sentence with them</li>
+          </ol>
         </div>
       ) : (
         <>

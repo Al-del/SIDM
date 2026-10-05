@@ -4,6 +4,22 @@ import { useEffect, useRef } from "react";
 import type { Entry } from "@/lib/api";
 import AlignmentMeter from "@/components/AlignmentMeter";
 
+function Legend() {
+  return (
+    <div className="legend">
+      <p className="empty">The answer builds here, one sentence per row. How to read a row:</p>
+      <dl>
+        <div><dt><span className="steer-sample">amber word</span></dt><dd>token picked while the neural logit bias favoured it</dd></div>
+        <div><dt><span className="chip out">→ memory</span></dt><dd>units injected into Qwen to steer this sentence</dd></div>
+        <div><dt><span className="chip in">← sleep</span></dt><dd>units decoded from the EEG while you read it</dd></div>
+        <div><dt><AlignmentMeter value={0.6} compact /></dt><dd>how well that decode matched the sentence on screen</dd></div>
+      </dl>
+    </div>
+  );
+}
+
+const time = (at: string | number) => new Date(typeof at === "number" ? at * 1000 : at).toLocaleTimeString();
+
 export default function Transcript({ entries }: { entries: Entry[] }) {
   const tailRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -11,11 +27,11 @@ export default function Transcript({ entries }: { entries: Entry[] }) {
   }, [entries.length]);
 
   return (
-    <div className="transcript">
-      {entries.length === 0 && <p className="empty" style={{ padding: "20px 34px" }}>The answer builds here sentence by sentence. Amber words were pushed by the neural bias; → chips were injected into Qwen, ← chips were decoded from your EEG while reading.</p>}
+    <div className="transcript" aria-label="Transcript">
+      {entries.length === 0 && <Legend />}
       {entries.map((e) => (
         <div className="tr-row" key={e.id}>
-          <span className="tr-idx num" title={e.at != null ? new Date(typeof e.at === "number" ? e.at * 1000 : e.at).toLocaleTimeString() : undefined}>{String(e.id + 1).padStart(2, "0")}</span>
+          <span className="tr-idx num" title={e.at != null ? time(e.at) : undefined}>{String(e.id + 1).padStart(2, "0")}</span>
           <div>
             <p className="tr-text">
               {e.tokens.map((t, i) => <span key={i} className={t.steered ? "steer" : ""}>{t.text}</span>)}
