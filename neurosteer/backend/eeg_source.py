@@ -2,6 +2,7 @@ import json
 import logging
 import threading
 import time
+from functools import lru_cache
 
 import numpy as np
 import torch
@@ -46,6 +47,7 @@ def generic_positions(n=config.N_CHANNELS):
     return [f"E{k + 1}" for k in range(n)], np.stack([r * np.sin(a), r * np.cos(a)], 1)
 
 
+@lru_cache(maxsize=1)
 def electrode_positions():
     if not config.CHANLOCS.exists():
         log.warning("%s missing: using a generic %d-channel layout", config.CHANLOCS, config.N_CHANNELS)
