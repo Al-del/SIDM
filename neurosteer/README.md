@@ -51,6 +51,24 @@ the models, so the whole loop runs on any laptop. `/api/status` reports `"mock":
 
 Tests run in mock mode: `cd backend && python -m pytest tests -q`.
 
+### The interface
+
+* **Top bar**: the READ → DECODE → INJECT → GENERATE pipeline animates the stage that's running, plus link status
+  for EEG / decoder / Qwen. If the backend runs simulated models it shows a **DEMO MODE** badge.
+* **Reader**: the current sentence with a reading-time ring. Amber underlined words were picked while the logit bias
+  favoured them. Under it, a stats strip (sentences, mean alignment, latency, % steered tokens, from `/api/stats`)
+  and the session tools: **A/B compare** (`/api/compare`, steered and baseline side by side with word overlap),
+  **Export** (`/api/export` JSON) and **Reset**.
+* **Transcript**: one row per sentence, with injected units (→), decoded units (←) and an alignment meter.
+* **Right column**: decoded units, the translated-ẑ readout, the injection plan, and the steering controls with
+  presets (subtle / balanced / strong / off). Below 1100 px wide it becomes a drawer (PANEL button).
+* **How it works** (`?`): a diagram of the loop written for non-experts, with the caveats (replay and synth are not
+  your brain; the signal is weak).
+
+Keyboard: `SPACE` done reading · `?` how it works · `C` compare · `E` export · `K` shortcuts · `Esc` close.
+Endpoints added after the first version are optional: the UI hides or falls back when they return 404
+(e.g. stats and export are computed from the browser's copy of the transcript).
+
 Requirements: the conda env from the repository root (`conda env create -f environment.yml`, which installs
 Python 3.12, Node and every Python package for the model and the app; `start.sh` uses it automatically), and the trained model in the repository root (paths in `backend/config.py`,
 overridable with `MOSAIC_DIR`, `BM_WORK`, `QWEN_MODEL`, `LLM_DEVICE`).
