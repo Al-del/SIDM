@@ -40,6 +40,9 @@ export function useSession({ settings, onError, onSentence }: Options) {
   const esRef = useRef<EventSource | null>(null);
   const endRef = useRef(false);
   const generateRef = useRef<() => void>(() => {});
+  
+  const runRef = useRef(0);
+  const startingRef = useRef(false);
   autoRef.current = auto;
   steerRef.current = steer;
   settingsRef.current = settings;
@@ -51,8 +54,10 @@ export function useSession({ settings, onError, onSentence }: Options) {
   const endReading = useCallback(async () => {
     if (phaseRef.current !== "reading") return;
     go("decoding");
+    const run = runRef.current;
     try {
       const d = await post<Decode>("/api/read/end");
+      if (run !== runRef.current) return;
       setDecode(d);
       setEntries((es) => es.map((e, i) => (i === es.length - 1 ? { ...e, decode: d } : e)));
       onSentenceRef.current?.();
@@ -60,19 +65,23 @@ export function useSession({ settings, onError, onSentence }: Options) {
       else if (autoRef.current) generateRef.current();
       else go("ready");
     } catch (e) {
+      if (run !== runRef.current) return;
       onErrorRef.current(errorText(e));
       go("ready");
     }
   }, [go]);
 
   const startReading = useCallback(async () => {
+    const run = runRef.current;
     try {
       await post("/api/read/start");
     } catch (e) {
+      if (run !== runRef.current) return;
       onErrorRef.current(errorText(e));
       go("ready");
       return;
     }
+    if (run !== runRef.current) return;
     readStart.current = performance.now();
     setReadStartedAt(readStart.current);
     go("reading");
@@ -128,12 +137,20 @@ export function useSession({ settings, onError, onSentence }: Options) {
   useEffect(() => () => esRef.current?.close(), []);
 
   const start = useCallback(async (question: string) => {
+    if (startingRef.current) return;
+    startingRef.current = true;
+    esRef.current?.close();
+    esRef.current = null;
+    const run = ++runRef.current;
     try {
       await post("/api/session", { question, settings: settingsRef.current });
     } catch (e) {
       onErrorRef.current(errorText(e));
       return;
+    } finally {
+      startingRef.current = false;
     }
+    if (run !== runRef.current) return;
     setAsked(question);
     endRef.current = false;
     setEntries([]);
@@ -155,6 +172,7 @@ export function useSession({ settings, onError, onSentence }: Options) {
   }, [endReading, go]);
 
   const newSession = useCallback(() => {
+    runRef.current++;
     esRef.current?.close();
     esRef.current = null;
     setT0(null);
@@ -163,6 +181,7 @@ export function useSession({ settings, onError, onSentence }: Options) {
 
   
   const clear = useCallback(() => {
+    runRef.current++;
     esRef.current?.close();
     esRef.current = null;
     endRef.current = false;

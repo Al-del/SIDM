@@ -40,14 +40,15 @@ export default function Page() {
 
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [sideOpen, setSideOpen] = useState(false);
+  const modalOpen = overlay === "help" || overlay === "compare";
   const toggle = (o: Exclude<Overlay, null>) => setOverlay((cur) => (cur === o ? null : o));
 
   useHotkeys({
-    " ": phase === "reading" && session.endReading,
+    " ": phase === "reading" && !modalOpen && session.endReading,
     k: () => toggle("keys"),
     "?": () => toggle("help"),
     Escape: () => { setOverlay(null); setSideOpen(false); },
-    e: () => doExport(),
+    e: !modalOpen && (() => doExport()),
     c: () => (overlay === "compare" ? setOverlay(null) : openCompare()),
   });
 
