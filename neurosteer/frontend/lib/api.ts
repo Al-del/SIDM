@@ -22,7 +22,7 @@ export type Decode = {
   brain_derived: boolean;
   source: string;
   
-  alignment?: number;
+  alignment?: number | null;
 };
 
 export type Plan = {
@@ -30,7 +30,7 @@ export type Plan = {
   weights: number[];
   prefix: number[][] | null;
   labels: string[];
-  mode: "translator" | "lookup";
+  mode: "translator" | "lookup" | "mock";
   bias_tokens: number;
   residual_norm: number;
   layer: number;
@@ -46,6 +46,8 @@ export type Entry = {
   decode: Decode | null;
   ms: number;
   end: boolean;
+  
+  at?: string | number;
 };
 
 export type Status = {
@@ -74,6 +76,7 @@ export type Stats = {
   sentences: number;
   mean_alignment: number | null;
   mean_latency_ms: number | null;
+  mean_decode_ms?: number | null;
   steered_tokens: number;
   total_tokens: number;
 };
@@ -130,7 +133,20 @@ export async function getOptional<T>(path: string): Promise<T | null> {
   }
 }
 
+export function streamErrorText(ev: Event, fallback: string): string {
+  if (ev instanceof MessageEvent && typeof ev.data === "string" && ev.data) {
+    try {
+      const d = JSON.parse(ev.data) as { error?: string; message?: string };
+      return d.error ?? d.message ?? fallback;
+    } catch {
+      return ev.data;
+    }
+  }
+  return fallback;
+}
+
 export function errorText(e: unknown): string {
+  if (e instanceof ApiError && e.status === 400) return e.message || "No active session: ask a question first.";
   if (e instanceof ApiError && e.status === 409) return "Qwen is already generating. Wait for it to finish.";
   if (e instanceof TypeError) return `Backend unreachable at ${API}`;
   return e instanceof Error ? e.message : String(e);

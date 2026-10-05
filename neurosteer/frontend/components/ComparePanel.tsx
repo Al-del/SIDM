@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
-import { API } from "@/lib/api";
+import { API, streamErrorText } from "@/lib/api";
 import type { CompareDone, CompareLane, CompareSummary, CompareToken, Token } from "@/lib/api";
 
 type Props = { open: boolean; onClose: () => void; question: string };
@@ -38,11 +38,12 @@ function useCompare(open: boolean, runId: number) {
       es.close();
       setRun((r) => ({ ...r, summary: JSON.parse((ev as MessageEvent).data) as CompareSummary }));
     });
-    es.onerror = () => {
+    es.onerror = (ev) => {
       es.close();
       setRun((r) => (r.summary ? r : {
         ...r,
-        error: got ? "The compare stream was interrupted." : "Compare is unavailable: the backend has no /api/compare, or Qwen is busy.",
+        error: streamErrorText(ev, got ? "The compare stream was interrupted."
+          : "Compare is unavailable: no active session, Qwen is busy generating, or the backend lacks /api/compare."),
       }));
     };
     return () => es.close();

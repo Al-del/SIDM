@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { API, errorText, post } from "@/lib/api";
+import { API, errorText, post, streamErrorText } from "@/lib/api";
 import type { Decode, Entry, Plan, Settings, Token } from "@/lib/api";
 
 export type Phase = "idle" | "generating" | "reading" | "decoding" | "ready" | "complete";
@@ -104,12 +104,13 @@ export function useSession({ settings, onError, onSentence }: Options) {
       setEntries((e) => [...e, rec]);
       startReading();
     });
-    es.onerror = () => {
+
+    es.onerror = (ev) => {
       es.close();
       if (esRef.current === es) esRef.current = null;
       if (phaseRef.current === "generating") {
         setInjecting(false);
-        onErrorRef.current("Generation stream failed (backend busy or unreachable)");
+        onErrorRef.current(streamErrorText(ev, "Generation failed: no active session, Qwen busy, or backend unreachable"));
         go("ready");
       }
     };

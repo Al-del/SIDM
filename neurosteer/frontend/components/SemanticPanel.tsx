@@ -78,7 +78,7 @@ export default function SemanticPanel({ readout, decode, plan, settings, steer, 
       <div className="section">
         <div className="section-head">
           <span className="label">Injection into Qwen</span>
-          {plan && <span className="label num" style={{ color: "var(--inject)" }}>{plan.mode === "translator" ? "256 → 2048 · " : "LOOKUP · "}L{plan.layer}</span>}
+          {plan && <span className="label num" style={{ color: "var(--inject)" }}>{plan.mode === "translator" ? "256 → 2048 · " : plan.mode === "mock" ? "SIMULATED · " : "LOOKUP · "}L{plan.layer}</span>}
         </div>
         {!plan && <p className="empty">Waiting for a decoded epoch to steer the next sentence.</p>}
         {plan?.prefix && (

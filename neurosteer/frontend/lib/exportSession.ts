@@ -12,13 +12,23 @@ function save(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function filenameFrom(cd: string | null): string | null {
+  if (!cd) return null;
+  const star = /filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i.exec(cd);
+  if (star) {
+    try { return decodeURIComponent(star[1].trim().replace(/^"|"$/g, "")); } catch {}
+  }
+  const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(cd);
+  return plain ? plain[1].trim() : null;
+}
+
 const stamp = () => new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 
 export async function exportSession(local: { question: string; entries: Entry[]; settings: Settings | null }): Promise<"backend" | "local"> {
   try {
     const r = await fetch(`${API}/api/export`);
     if (!r.ok) throw new ApiError(r.statusText, r.status);
-    save(await r.blob(), `neurosteer-session-${stamp()}.json`);
+    save(await r.blob(), filenameFrom(r.headers.get("Content-Disposition")) ?? `neurosteer-session-${stamp()}.json`);
     return "backend";
   } catch (e) {
     if (e instanceof ApiError && e.status !== 404 && e.status !== 405) throw e;

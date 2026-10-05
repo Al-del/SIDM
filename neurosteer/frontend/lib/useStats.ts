@@ -11,7 +11,8 @@ export function localStats(entries: Entry[]): Stats {
   return {
     sentences: entries.length,
     mean_alignment: mean(entries.flatMap((e) => (typeof e.decode?.alignment === "number" ? [e.decode.alignment] : []))),
-    mean_latency_ms: mean(entries.flatMap((e) => (e.decode ? [e.decode.latency_ms] : []))),
+    mean_latency_ms: mean(entries.map((e) => e.ms)),
+    mean_decode_ms: mean(entries.flatMap((e) => (e.decode ? [e.decode.latency_ms] : []))),
     steered_tokens: tokens.filter((t) => t.steered).length,
     total_tokens: tokens.length,
   };

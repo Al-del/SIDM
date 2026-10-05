@@ -15,7 +15,7 @@ export default function Transcript({ entries }: { entries: Entry[] }) {
       {entries.length === 0 && <p className="empty" style={{ padding: "20px 34px" }}>The answer builds here sentence by sentence. Amber words were pushed by the neural bias; → chips were injected into Qwen, ← chips were decoded from your EEG while reading.</p>}
       {entries.map((e) => (
         <div className="tr-row" key={e.id}>
-          <span className="tr-idx num">{String(e.id + 1).padStart(2, "0")}</span>
+          <span className="tr-idx num" title={e.at != null ? new Date(typeof e.at === "number" ? e.at * 1000 : e.at).toLocaleTimeString() : undefined}>{String(e.id + 1).padStart(2, "0")}</span>
           <div>
             <p className="tr-text">
               {e.tokens.map((t, i) => <span key={i} className={t.steered ? "steer" : ""}>{t.text}</span>)}
