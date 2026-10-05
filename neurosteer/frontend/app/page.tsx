@@ -13,6 +13,7 @@ import ShortcutHint from "@/components/ShortcutHint";
 import HowItWorks from "@/components/HowItWorks";
 import StatsStrip from "@/components/StatsStrip";
 import SessionActions from "@/components/SessionActions";
+import ComparePanel from "@/components/ComparePanel";
 import { API, ApiError, errorText, post } from "@/lib/api";
 import { exportSession } from "@/lib/exportSession";
 import { useBackend } from "@/lib/useBackend";
@@ -22,7 +23,7 @@ import { useEEG } from "@/lib/useEEG";
 import { useHotkeys } from "@/lib/useHotkeys";
 import { useStats } from "@/lib/useStats";
 
-type Overlay = "keys" | "help" | null;
+type Overlay = "keys" | "help" | "compare" | null;
 
 export default function Page() {
   const [question, setQuestion] = useState("Why do we dream?");
@@ -46,6 +47,7 @@ export default function Page() {
     "?": () => toggle("help"),
     Escape: () => setOverlay(null),
     e: () => doExport(),
+    c: () => (overlay === "compare" ? setOverlay(null) : openCompare()),
   });
 
   const start = () => session.start(question);
@@ -62,6 +64,16 @@ export default function Page() {
     } finally {
       setExporting(false);
     }
+  };
+
+  const busy = phase === "generating" || phase === "reading" || phase === "decoding";
+  const compareHint = backend.health === null ? "This backend has no /api/compare"
+    : !entries.length ? "Ask a question first: compare needs a sentence to continue from"
+    : busy ? "Pause the loop (Stop) to compare" : "Generate the next sentence with and without steering (C)";
+  const canCompare = backend.health !== null && entries.length > 0 && !busy;
+  const openCompare = () => {
+    if (canCompare) setOverlay("compare");
+    else notify("info", compareHint);
   };
 
   const doReset = async () => {
@@ -111,7 +123,8 @@ export default function Page() {
             onQuestion={setQuestion} onStart={start} onNext={session.next} onNewSession={session.newSession} onStop={session.stop} />
           <div className="sessionbar">
             <StatsStrip stats={stats} remote={remote} />
-            <SessionActions onExport={doExport} onReset={doReset} exporting={exporting} canExport={entries.length > 0} />
+            <SessionActions onExport={doExport} onReset={doReset} exporting={exporting} canExport={entries.length > 0}
+              compare={backend.health === null ? undefined : { onClick: openCompare, disabled: !canCompare, hint: compareHint }} />
           </div>
           <Transcript entries={entries} />
         </section>
@@ -124,6 +137,7 @@ export default function Page() {
       </main>
 
       <HowItWorks open={overlay === "help"} onClose={() => setOverlay(null)} source={eeg?.label} mock={backend.mock} />
+      <ComparePanel open={overlay === "compare"} onClose={() => setOverlay(null)} question={asked} />
       <Toasts toasts={toasts} onDismiss={dismiss} />
       <Raster traces={traces} labels={montage?.display_labels ?? []} rate={rate} source={eeg?.label} />
     </div>
