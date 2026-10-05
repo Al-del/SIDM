@@ -416,9 +416,16 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 14px; background: va
 .boot-lines .ok { color: var(--signal); }
 .boot-lines .err { color: var(--alert); }
 .boot-lines .warn { color: var(--inject); margin-top: 10px; }
+.boot-lines .wait { color: var(--inject); animation: blink 0.9s steps(2) infinite; }
+.boot-bar { width: 380px; height: 1px; background: var(--line-2); position: relative; overflow: hidden; }
+.boot-bar span { position: absolute; top: 0; bottom: 0; width: 30%; background: linear-gradient(90deg, transparent, var(--signal), transparent); animation: bootbar 1.4s var(--ease) infinite; }
+.boot-bar.fault span { background: linear-gradient(90deg, transparent, var(--alert), transparent); animation-duration: 2.4s; }
+@keyframes bootbar { from { left: -30%; } to { left: 100%; } }
+.boot-help { margin-top: 12px; max-width: 420px; white-space: normal; display: flex; flex-direction: column; gap: 6px; }
+.boot-help code { color: var(--text); }
 
 .modal-back {
-  position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center;
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
   padding: 24px; background: rgba(2, 3, 4, 0.72); backdrop-filter: blur(6px);
   animation: fadein 240ms var(--ease) both;
 }

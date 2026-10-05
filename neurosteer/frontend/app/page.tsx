@@ -14,7 +14,7 @@ import HowItWorks from "@/components/HowItWorks";
 import StatsStrip from "@/components/StatsStrip";
 import SessionActions from "@/components/SessionActions";
 import ComparePanel from "@/components/ComparePanel";
-import { API, ApiError, errorText, post } from "@/lib/api";
+import { ApiError, errorText, post } from "@/lib/api";
 import { exportSession } from "@/lib/exportSession";
 import { useBackend } from "@/lib/useBackend";
 import { useSession } from "@/lib/useSession";
@@ -100,7 +100,7 @@ export default function Page() {
 
   return (
     <div className="shell">
-      <Boot status={status} mock={backend.mock} error={backend.unreachable && !status ? `Backend unreachable at ${API}` : null} hidden={ready} />
+      <Boot status={status} mock={backend.mock} unreachable={backend.unreachable} hidden={ready} onHelp={() => setOverlay("help")} />
 
       <TopBar stageOn={stageOn} connected={connected} status={status} health={backend.health} mock={backend.mock} t0={t0}>
         <div className="tools">
