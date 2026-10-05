@@ -5,3 +5,4 @@ numpy
 scipy
 pylsl
 mne
+pytest
