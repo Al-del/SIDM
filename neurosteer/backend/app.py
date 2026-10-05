@@ -137,8 +137,8 @@ def status():
     })
 
 
-def display():
-    src = acq.source
+def display(src=None):
+    src = src or acq.source
     if src is not None and src.display:
         return [i for i, _ in src.display], [l for _, l in src.display]
     return DISPLAY, [LABELS[i] for i in DISPLAY]
@@ -168,11 +168,20 @@ def set_source():
 @app.get("/api/eeg")
 def eeg_stream():
     def gen():
+        try:
+            yield from frames()
+        except GeneratorExit:
+            log.info("EEG stream closed by client")
+
+    def frames():
         last = acq.now()
-        tick = 0
+        tick, pinged = 0, time.time()
         while True:
             buf, src = acq.buffer, acq.source
             if buf is None or src is None:
+                if time.time() - pinged > PING_S:
+                    pinged = time.time()
+                    yield ": ping\n\n"
                 time.sleep(0.2)
                 continue
             now = buf.total
@@ -182,7 +191,7 @@ def eeg_stream():
             last = now
             dec = max(1, src.fs // 125)
             frame = {"t": now, "fs": src.fs / dec,
-                     "samples": np.round(x[display()[0], ::dec], 3).tolist(),
+                     "samples": np.round(x[display(src)[0], ::dec], 3).tolist(),
                      "reading": session["read"] is not None}
             yield event("eeg", frame)
             tick += 1
