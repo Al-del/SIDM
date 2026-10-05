@@ -12,7 +12,6 @@ type Props = {
   translator: boolean;
   question: string;
   ready: boolean;
-  error: string | null;
   onQuestion: (q: string) => void;
   onStart: () => void;
   onNext: () => void;
@@ -79,7 +78,6 @@ export default function Reader(p: Props) {
               <button className="btn ghost" style={{ marginLeft: "auto" }} onClick={p.onStop}>Stop</button>
             )}
           </div>
-          {p.error && <p className="notice" style={{ maxWidth: 520 }}>{p.error}</p>}
         </>
       )}
     </div>

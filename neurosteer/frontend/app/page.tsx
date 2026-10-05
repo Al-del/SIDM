@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import LeftRail from "@/components/LeftRail";
 import Raster from "@/components/Raster";
 import SemanticPanel from "@/components/SemanticPanel";
@@ -8,9 +8,11 @@ import TopBar from "@/components/TopBar";
 import Boot from "@/components/Boot";
 import Reader from "@/components/Reader";
 import Transcript from "@/components/Transcript";
-import { API, get, post } from "@/lib/api";
+import Toasts from "@/components/Toasts";
+import { API, errorText, get, post } from "@/lib/api";
 import type { Montage, Settings, Status } from "@/lib/api";
 import { useSession } from "@/lib/useSession";
+import { useToasts } from "@/lib/useToasts";
 import { useEEG } from "@/lib/useEEG";
 
 export default function Page() {
@@ -18,16 +20,18 @@ export default function Page() {
   const [montage, setMontage] = useState<Montage | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [question, setQuestion] = useState("Why do we dream?");
-  const [error, setError] = useState<string | null>(null);
+  const [bootError, setBootError] = useState<string | null>(null);
   const [switching, setSwitching] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const session = useSession({ settings, onError: setError });
+  const { toasts, notify, dismiss } = useToasts();
+  const onError = useCallback((m: string) => notify("error", m), [notify]);
+  const session = useSession({ settings, onError });
   const { phase, asked, readout, live, entries, decode, plan, injecting, readT, steer, auto, t0 } = session;
   const { traces, metrics, connected, rate } = useEEG(montage?.display.length ?? 0);
 
   useEffect(() => {
-    get<Montage>("/api/montage").then(setMontage).catch(() => setError("Backend unreachable at " + API));
+    get<Montage>("/api/montage").then(setMontage).catch(() => setBootError("Backend unreachable at " + API));
     let alive = true;
     const poll = async () => {
       try {
@@ -50,17 +54,14 @@ export default function Page() {
     return () => window.removeEventListener("keydown", onKey);
   }, [phase, session.endReading]);
 
-  const start = () => {
-    setError(null);
-    session.start(question);
-  };
+  const start = () => session.start(question);
 
   const onSetting = (k: keyof Settings, v: number | boolean) => {
     setSettings((s) => {
       if (!s) return s;
       const next = { ...s, [k]: v };
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => post("/api/settings", { [k]: v }).catch(() => {}), 200);
+      saveTimer.current = setTimeout(() => post("/api/settings", { [k]: v }).catch((e) => onError(errorText(e))), 200);
       return next;
     });
   };
@@ -71,9 +72,9 @@ export default function Page() {
       await post("/api/source", { kind });
       setStatus(await get<Status>("/api/status"));
       setMontage(await get<Montage>("/api/montage"));
-      setError(null);
+      notify("ok", `Signal source: ${kind}`);
     } catch (e) {
-      setError(String(e));
+      onError(errorText(e));
     } finally {
       setSwitching(null);
     }
@@ -91,7 +92,7 @@ export default function Page() {
 
   return (
     <div className="shell">
-      <Boot status={status} error={error && !status ? error : null} hidden={ready} />
+      <Boot status={status} error={!status ? bootError : null} hidden={ready} />
 
       <TopBar stageOn={stageOn} connected={connected} status={status} t0={t0} />
 
@@ -103,7 +104,7 @@ export default function Page() {
 
         <section className="col reader">
           <Reader phase={phase} asked={asked} tokens={current} count={entries.length} injecting={injecting} readT={readT}
-            translator={!!status?.llm?.translator} question={question} ready={ready} error={error}
+            translator={!!status?.llm?.translator} question={question} ready={ready}
             onQuestion={setQuestion} onStart={start} onNext={session.next} onNewSession={session.newSession} onStop={session.stop} />
           <Transcript entries={entries} />
         </section>
@@ -114,6 +115,7 @@ export default function Page() {
         </aside>
       </main>
 
+      <Toasts toasts={toasts} onDismiss={dismiss} />
       <Raster traces={traces} labels={montage?.display_labels ?? []} rate={rate} source={eeg?.label} />
     </div>
   );
