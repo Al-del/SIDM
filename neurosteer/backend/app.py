@@ -92,6 +92,8 @@ def preflight():
 
 @app.errorhandler(HTTPException)
 def http_error(e):
+    if e.code is None or e.code < 400:
+        return e
     return jsonify({"error": e.description, "status": e.code}), e.code
 
 
