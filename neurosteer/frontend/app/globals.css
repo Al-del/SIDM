@@ -255,6 +255,30 @@ button, input { font: inherit; color: inherit; }
 .btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .btn.ghost { border-color: transparent; color: var(--dim); }
 
+.sessionbar {
+  display: flex; align-items: stretch; justify-content: space-between; gap: 16px;
+  border-bottom: 1px solid var(--line-2); padding: 0 20px 0 0; min-height: 58px;
+}
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); flex: 1; min-width: 0; }
+.kpi { display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 9px 18px; min-width: 0; position: relative; }
+.kpi + .kpi { border-left: 1px solid var(--line); }
+.kpi .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 9px; }
+.kpi-v { font-size: 17px; color: var(--text); line-height: 1; }
+.kpi-v small { font-size: 10px; color: var(--dim); }
+.kpi-bar { position: absolute; left: 18px; right: 18px; bottom: 7px; height: 1px; background: var(--line-2); }
+.kpi-bar span { position: absolute; left: 0; top: -1px; height: 3px; background: var(--signal); box-shadow: 0 0 8px rgba(127, 227, 255, 0.6); transition: width 600ms var(--ease); }
+.kpi-bar.amber span { background: var(--inject); box-shadow: 0 0 8px rgba(255, 176, 74, 0.6); }
+
+.align { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono), monospace; font-size: 9.5px; letter-spacing: 0.12em; color: var(--dim); }
+.align.compact { padding: 2px 7px; border: 1px solid var(--line-2); gap: 6px; }
+.align-segs { display: inline-flex; gap: 2px; }
+.align-segs i { width: 4px; height: 9px; background: var(--line-2); transition: background 300ms; }
+.align.compact .align-segs i { width: 3px; height: 7px; }
+.align-segs i.lo { background: rgba(127, 227, 255, 0.35); }
+.align-segs i.mid { background: rgba(127, 227, 255, 0.65); }
+.align-segs i.hi { background: var(--signal); box-shadow: 0 0 5px rgba(127, 227, 255, 0.6); }
+.align-v { color: var(--text); letter-spacing: 0.04em; }
+
 .transcript { flex: 1; overflow: auto; padding: 8px 0 20px; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
 .tr-row { display: grid; grid-template-columns: 56px 1fr; padding: 14px 34px 14px 20px; border-bottom: 1px solid var(--line); animation: rowin 500ms var(--ease) both; }
 @keyframes rowin { from { opacity: 0; transform: translateY(6px); } }

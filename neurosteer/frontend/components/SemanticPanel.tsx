@@ -1,6 +1,7 @@
 "use client";
 
 import type { Decode, Plan, Settings } from "@/lib/api";
+import AlignmentMeter from "@/components/AlignmentMeter";
 
 type Props = {
   readout: string | null;
@@ -37,6 +38,7 @@ export default function SemanticPanel({ readout, decode, plan, settings, steer, 
           <span className="label">Decoded semantic units</span>
           {decode && <span className="label num">{decode.seconds.toFixed(1)}s · {decode.latency_ms}ms</span>}
         </div>
+        {typeof decode?.alignment === "number" && <div style={{ marginBottom: 12 }}><AlignmentMeter value={decode.alignment} /></div>}
         {!decode && <p className="empty">No epoch yet. Units appear after the first sentence has been read.</p>}
         {decode?.units.map((u, i) => (
           <div className="unit" key={`${u.unit}-${i}`} style={{ animationDelay: `${i * 35}ms` }}>

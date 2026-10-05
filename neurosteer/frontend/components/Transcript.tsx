@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { Entry } from "@/lib/api";
+import AlignmentMeter from "@/components/AlignmentMeter";
 
 export default function Transcript({ entries }: { entries: Entry[] }) {
   const tailRef = useRef<HTMLDivElement>(null);
@@ -23,6 +24,7 @@ export default function Transcript({ entries }: { entries: Entry[] }) {
               {e.plan?.units.slice(0, 6).map((u) => <span key={"o" + u} className="chip out">→ {u}</span>)}
               {e.decode?.units.slice(0, 6).map((u) => <span key={"i" + u.unit} className="chip in">← {u.word}</span>)}
               <span className="chip num">{e.ms} ms</span>
+              <AlignmentMeter value={e.decode?.alignment} compact />
             </div>
           </div>
         </div>

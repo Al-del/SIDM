@@ -11,12 +11,14 @@ import Transcript from "@/components/Transcript";
 import Toasts from "@/components/Toasts";
 import ShortcutHint from "@/components/ShortcutHint";
 import HowItWorks from "@/components/HowItWorks";
+import StatsStrip from "@/components/StatsStrip";
 import { API } from "@/lib/api";
 import { useBackend } from "@/lib/useBackend";
 import { useSession } from "@/lib/useSession";
 import { useToasts } from "@/lib/useToasts";
 import { useEEG } from "@/lib/useEEG";
 import { useHotkeys } from "@/lib/useHotkeys";
+import { useStats } from "@/lib/useStats";
 
 type Overlay = "keys" | "help" | null;
 
@@ -26,9 +28,12 @@ export default function Page() {
   const onError = useCallback((m: string) => notify("error", m), [notify]);
   const backend = useBackend(notify);
   const { status, montage, settings, ready } = backend;
-  const session = useSession({ settings, onError });
+  const [statsTick, setStatsTick] = useState(0);
+  const onSentence = useCallback(() => setStatsTick((t) => t + 1), []);
+  const session = useSession({ settings, onError, onSentence });
   const { phase, asked, readout, live, entries, decode, plan, injecting, readT, steer, auto, t0 } = session;
   const { traces, metrics, connected, rate } = useEEG(montage?.display.length ?? 0);
+  const { stats, remote } = useStats(statsTick, entries);
 
   const [overlay, setOverlay] = useState<Overlay>(null);
   const toggle = (o: Exclude<Overlay, null>) => setOverlay((cur) => (cur === o ? null : o));
@@ -74,6 +79,9 @@ export default function Page() {
           <Reader phase={phase} asked={asked} tokens={current} count={entries.length} injecting={injecting} readT={readT}
             translator={!!status?.llm?.translator} question={question} ready={ready}
             onQuestion={setQuestion} onStart={start} onNext={session.next} onNewSession={session.newSession} onStop={session.stop} />
+          <div className="sessionbar">
+            <StatsStrip stats={stats} remote={remote} />
+          </div>
           <Transcript entries={entries} />
         </section>
 
