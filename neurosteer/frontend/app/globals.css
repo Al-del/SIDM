@@ -174,7 +174,9 @@ input[type="range"]:focus-visible { outline-offset: 4px; }
 .clock { color: var(--text); font-size: 11px; min-width: 64px; text-align: right; }
 
 .array-wrap { position: relative; aspect-ratio: 1; margin: 4px auto 0; width: 100%; max-width: 260px; }
-.array-wrap svg { width: 100%; height: 100%; overflow: visible; }
+.array-wrap svg { width: 100%; height: 100%; overflow: visible; position: relative; }
+.topo { position: absolute; border-radius: 50%; filter: blur(3px) saturate(1.1); opacity: 0.9; transition: opacity 400ms; }
+.array-wrap.reading .topo { opacity: 1; }
 .spin { transform-origin: 150px 150px; animation: spin 60s linear infinite; }
 .spin-rev { transform-origin: 150px 150px; animation: spin 90s linear infinite reverse; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -185,7 +187,13 @@ input[type="range"]:focus-visible { outline-offset: 4px; }
 
 .bands { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; align-items: end; height: 92px; }
 .band { display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
-.band-bar { width: 100%; background: var(--signal-soft); border-top: 1px solid var(--signal); transition: height 300ms var(--ease); }
+.band-bar {
+  width: 100%; position: relative;
+  background: linear-gradient(180deg, rgba(127, 227, 255, 0.28), rgba(127, 227, 255, 0.03));
+  border-top: 1px solid var(--signal); box-shadow: 0 -4px 12px -6px var(--signal);
+  transition: height 300ms var(--ease);
+}
+.band-v { position: absolute; left: 0; right: 0; top: -15px; text-align: center; font-size: 9px; color: var(--dim); }
 .band-name { font-family: var(--font-mono), monospace; font-size: 9px; letter-spacing: 0.1em; color: var(--dim); }
 
 .seg { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line-2); }

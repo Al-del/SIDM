@@ -34,7 +34,9 @@ export default function LeftRail({ montage, metrics, reading, eeg, decode, switc
         <div className="bands" role="img" aria-label={`Relative band power: ${BANDS.map((b) => `${b} ${Math.round((metrics?.bands[b] ?? 0) * 100)}%`).join(", ")}`}>
           {BANDS.map((b) => (
             <div className="band" key={b}>
-              <div className="band-bar" style={{ height: `${Math.max(3, (metrics?.bands[b] ?? 0) * 140)}%` }} />
+              <div className="band-bar" style={{ height: `${Math.min(88, Math.max(3, (metrics?.bands[b] ?? 0) * 140))}%` }}>
+                {metrics && <span className="band-v num">{Math.round((metrics.bands[b] ?? 0) * 100)}</span>}
+              </div>
               <span className="band-name">{b.slice(0, 3).toUpperCase()}</span>
             </div>
           ))}
