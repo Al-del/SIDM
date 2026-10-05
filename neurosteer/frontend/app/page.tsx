@@ -10,6 +10,7 @@ import Reader from "@/components/Reader";
 import Transcript from "@/components/Transcript";
 import Toasts from "@/components/Toasts";
 import ShortcutHint from "@/components/ShortcutHint";
+import HowItWorks from "@/components/HowItWorks";
 import { API } from "@/lib/api";
 import { useBackend } from "@/lib/useBackend";
 import { useSession } from "@/lib/useSession";
@@ -17,7 +18,7 @@ import { useToasts } from "@/lib/useToasts";
 import { useEEG } from "@/lib/useEEG";
 import { useHotkeys } from "@/lib/useHotkeys";
 
-type Overlay = "keys" | null;
+type Overlay = "keys" | "help" | null;
 
 export default function Page() {
   const [question, setQuestion] = useState("Why do we dream?");
@@ -35,6 +36,7 @@ export default function Page() {
   useHotkeys({
     " ": phase === "reading" && session.endReading,
     k: () => toggle("keys"),
+    "?": () => toggle("help"),
     Escape: () => setOverlay(null),
   });
 
@@ -54,6 +56,8 @@ export default function Page() {
 
       <TopBar stageOn={stageOn} connected={connected} status={status} health={backend.health} mock={backend.mock} t0={t0}>
         <div className="tools">
+          <button className={`tool ${overlay === "help" ? "on" : ""}`} onClick={() => toggle("help")}
+            aria-label="How it works" title="How it works (?)">? HOW IT WORKS</button>
           <button className={`tool ${overlay === "keys" ? "on" : ""}`} onClick={() => toggle("keys")}
             aria-expanded={overlay === "keys"} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (K)">KEYS</button>
           <ShortcutHint open={overlay === "keys"} onClose={() => setOverlay(null)} />
@@ -79,6 +83,7 @@ export default function Page() {
         </aside>
       </main>
 
+      <HowItWorks open={overlay === "help"} onClose={() => setOverlay(null)} source={eeg?.label} mock={backend.mock} />
       <Toasts toasts={toasts} onDismiss={dismiss} />
       <Raster traces={traces} labels={montage?.display_labels ?? []} rate={rate} source={eeg?.label} />
     </div>

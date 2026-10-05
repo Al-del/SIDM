@@ -320,6 +320,53 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 14px; background: va
 .boot-lines .err { color: var(--alert); }
 .boot-lines .warn { color: var(--inject); margin-top: 10px; }
 
+.modal-back {
+  position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: rgba(2, 3, 4, 0.72); backdrop-filter: blur(6px);
+  animation: fadein 240ms var(--ease) both;
+}
+@keyframes fadein { from { opacity: 0; } }
+.modal {
+  position: relative; width: min(760px, 100%); max-height: calc(100vh - 48px); overflow: auto;
+  background: var(--panel); border: 1px solid var(--line-2);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(127, 227, 255, 0.04);
+  animation: modalin 360ms var(--ease) both; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent;
+}
+.modal.wide { width: min(1080px, 100%); }
+@keyframes modalin { from { opacity: 0; transform: translateY(10px) scale(0.985); } }
+.modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding: 26px 30px 0; }
+.modal-head h2 { font-weight: 300; font-size: 26px; letter-spacing: -0.015em; margin-top: 6px; }
+.modal-body { padding: 18px 30px 30px; }
+
+.hw-svg { width: 100%; height: auto; display: block; margin: 6px 0 4px; color: var(--signal); }
+.hw-node { fill: rgba(205, 225, 245, 0.025); stroke: var(--line-3); }
+.hw-node.accent { fill: var(--signal-soft); stroke: rgba(127, 227, 255, 0.55); }
+.hw-qwen { fill: rgba(205, 225, 245, 0.02); stroke: var(--line-3); stroke-dasharray: 3 3; }
+.hw-layer { fill: rgba(205, 225, 245, 0.04); stroke: var(--line-2); }
+.hw-layer.dim { fill: none; stroke: var(--line); }
+.hw-layer.hot { fill: var(--inject-soft); stroke: rgba(255, 176, 74, 0.55); }
+.hw-title { font-family: var(--font-mono), monospace; font-size: 11px; letter-spacing: 0.16em; fill: var(--text); }
+.hw-sub { font-family: var(--font-mono), monospace; font-size: 9.5px; letter-spacing: 0.04em; fill: var(--dim); }
+.hw-chan { font-family: var(--font-mono), monospace; font-size: 9.5px; letter-spacing: 0.1em; fill: var(--inject); }
+.hw-flow path, .hw-flow line { fill: none; stroke-width: 1.2; stroke-dasharray: 5 4; animation: dash 1.2s linear infinite; }
+.hw-flow.signal { color: var(--signal); stroke: var(--signal); }
+.hw-flow.inject { color: var(--inject); stroke: var(--inject); }
+.hw-flow.loop { color: var(--faint); stroke: var(--faint); }
+.hw-flow.loop path { animation-duration: 3s; }
+@keyframes dash { to { stroke-dashoffset: -18; } }
+.hw-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line-2); border: 1px solid var(--line-2); margin-top: 18px; }
+.hw-steps > div { background: var(--panel); padding: 18px 20px; }
+.hw-n { font-size: 10px; color: var(--signal); letter-spacing: 0.14em; }
+.hw-steps h3 { font-weight: 400; font-size: 17px; margin: 6px 0 8px; }
+.hw-steps p { font-size: 13px; line-height: 1.55; color: var(--dim); }
+.hw-caveats { margin-top: 18px; padding: 16px 18px; border-left: 2px solid var(--inject); background: rgba(255, 176, 74, 0.06); }
+.hw-caveats ul { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.hw-caveats li { font-size: 13px; line-height: 1.55; color: #e6d3b8; padding-left: 14px; position: relative; }
+.hw-caveats li::before { content: ""; position: absolute; left: 0; top: 0.65em; width: 5px; height: 1px; background: var(--inject); }
+.hw-caveats b { color: var(--text); font-weight: 500; }
+.hw-keys { margin-top: 18px; }
+.hw-keys .keys-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 18px; }
+
 .toasts {
   position: fixed; right: 20px; bottom: 226px; z-index: 40;
   display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
