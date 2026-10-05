@@ -1,5 +1,4 @@
 results/
-weights/
 data/
 datasets/
 work/
@@ -22,4 +21,4 @@ __pycache__/
 .next/
 next-env.d.ts
 *.tsbuildinfo
-neurosteer/backend/weights/
+.claude/worktrees/
