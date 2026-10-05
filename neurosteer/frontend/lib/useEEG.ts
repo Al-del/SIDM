@@ -24,16 +24,19 @@ export function useEEG(channels: number) {
 
   useEffect(() => {
     if (!channels) return;
+
+    traces.current = null;
     const es = new EventSource(`${API}/api/eeg`);
     let count = 0;
     let t0 = performance.now();
     es.onopen = () => setConnected(true);
+
     es.onerror = () => setConnected(false);
     es.addEventListener("eeg", (ev) => {
       const f = JSON.parse((ev as MessageEvent).data) as { fs: number; samples: number[][]; reading: boolean };
       const n = f.samples[0]?.length ?? 0;
       let tr = traces.current;
-      if (!tr || tr.fs !== f.fs) {
+      if (!tr || tr.fs !== f.fs || tr.data.length !== channels) {
         const size = Math.round(f.fs * WINDOW_SECONDS);
         tr = {
           data: Array.from({ length: channels }, () => new Float32Array(size)),
@@ -43,7 +46,7 @@ export function useEEG(channels: number) {
       }
       for (let i = 0; i < n; i++) {
         const p = (tr.head + i) % tr.size;
-        for (let c = 0; c < channels; c++) tr.data[c][p] = f.samples[c][i];
+        for (let c = 0; c < channels; c++) tr.data[c][p] = f.samples[c]?.[i] ?? 0;
         tr.reading[p] = f.reading ? 1 : 0;
       }
       tr.head = (tr.head + n) % tr.size;
@@ -57,7 +60,7 @@ export function useEEG(channels: number) {
       }
     });
     es.addEventListener("metrics", (ev) => setMetrics(JSON.parse((ev as MessageEvent).data)));
-    return () => es.close();
+    return () => { es.close(); setConnected(false); };
   }, [channels]);
 
   return { traces, metrics, connected, rate };
