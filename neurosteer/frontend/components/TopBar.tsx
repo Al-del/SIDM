@@ -1,30 +1,54 @@
+import type { ReactNode } from "react";
 import Logo from "@/components/Logo";
 import Pipeline from "@/components/Pipeline";
 import type { Stage } from "@/components/Pipeline";
 import Clock from "@/components/Clock";
-import type { Status } from "@/lib/api";
+import type { Health, Status } from "@/lib/api";
 
 type Props = {
   stageOn: Record<Stage, boolean>;
   connected: boolean;
   status: Status | null;
+  health: Health | null | undefined;
+  mock: boolean;
   t0: number | null;
+  children?: ReactNode;
 };
 
-export default function TopBar({ stageOn, connected, status, t0 }: Props) {
+const uptime = (s: number) => (s < 3600 ? `${Math.floor(s / 60)} min` : `${(s / 3600).toFixed(1)} h`);
+
+export default function TopBar({ stageOn, connected, status, health, mock, t0, children }: Props) {
+  const llm = status?.llm;
   return (
     <header className="topbar">
       <div className="brand">
         <Logo />
         <span className="brand-name">NEUROSTEER</span>
-        <span className="brand-sub mono">EEG → QWEN / CLOSED LOOP</span>
+        <span className="brand-sub mono"
+          title={health ? `backend v${health.version} · up ${uptime(health.uptime_s)}` : undefined}>
+          EEG → QWEN / CLOSED LOOP{health?.version ? ` · v${health.version}` : ""}
+        </span>
+        {mock && (
+          <span className="demo-badge" role="status"
+            title="The backend is running simulated models: tokens and decodes are synthetic, for showing the interface only.">
+            <span className="demo-dot" />DEMO MODE · simulated models
+          </span>
+        )}
       </div>
       <Pipeline on={stageOn} />
       <div className="links">
-        <span className="link"><span className={`dot ${connected ? "ok" : "err"}`} />EEG</span>
-        <span className="link"><span className={`dot ${status?.decoder ? "ok" : status?.errors.decoder ? "err" : "wait"}`} />DECODER</span>
-        <span className="link"><span className={`dot ${status?.llm ? "ok" : status?.errors.llm ? "err" : "wait"}`} />QWEN</span>
+        <span className="link" title={connected ? "EEG stream connected" : "EEG stream offline"}>
+          <span className={`dot ${connected ? "ok" : "err"}`} />EEG
+        </span>
+        <span className="link" title={status?.errors.decoder ?? (status?.decoder ? "RAG-Mosaic decoder loaded" : "Decoder loading")}>
+          <span className={`dot ${status?.decoder ? "ok" : status?.errors.decoder ? "err" : "wait"}`} />DECODER
+        </span>
+        <span className="link"
+          title={status?.errors.llm ?? (llm ? `${llm.name} · ${llm.layers} layers · steer L${llm.steer_layer} · ${llm.device}${llm.mock ? " · simulated" : ""}` : "LLM loading")}>
+          <span className={`dot ${llm ? (llm.mock ? "mock" : "ok") : status?.errors.llm ? "err" : "wait"}`} />QWEN
+        </span>
         <Clock t0={t0} />
+        {children}
       </div>
     </header>
   );

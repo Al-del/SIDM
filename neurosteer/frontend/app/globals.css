@@ -135,6 +135,14 @@ button, input { font: inherit; color: inherit; }
 .dot.err { background: var(--alert); }
 @keyframes breathe { 50% { opacity: 0.45; } }
 @keyframes blink { 50% { opacity: 0.2; } }
+.dot.mock { background: var(--inject); box-shadow: 0 0 8px var(--inject); }
+.demo-badge {
+  display: inline-flex; align-items: center; gap: 7px; margin-left: 6px;
+  padding: 4px 9px; border: 1px solid rgba(255, 176, 74, 0.5); background: var(--inject-soft);
+  font-family: var(--font-mono), monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--inject); white-space: nowrap;
+}
+.demo-dot { width: 5px; height: 5px; background: var(--inject); box-shadow: 0 0 6px var(--inject); animation: blink 1.4s steps(2) infinite; }
 .clock { color: var(--text); font-size: 11px; min-width: 64px; text-align: right; }
 
 .array-wrap { position: relative; aspect-ratio: 1; margin: 4px auto 0; width: 100%; max-width: 260px; }
@@ -290,6 +298,7 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 14px; background: va
 .boot-lines { font-family: var(--font-mono), monospace; font-size: 11px; color: var(--dim); line-height: 1.9; min-width: 380px; }
 .boot-lines .ok { color: var(--signal); }
 .boot-lines .err { color: var(--alert); }
+.boot-lines .warn { color: var(--inject); margin-top: 10px; }
 
 .toasts {
   position: fixed; right: 20px; bottom: 226px; z-index: 40;

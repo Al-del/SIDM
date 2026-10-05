@@ -45,9 +45,9 @@ export default function Page() {
 
   return (
     <div className="shell">
-      <Boot status={status} error={backend.unreachable && !status ? `Backend unreachable at ${API}` : null} hidden={ready} />
+      <Boot status={status} mock={backend.mock} error={backend.unreachable && !status ? `Backend unreachable at ${API}` : null} hidden={ready} />
 
-      <TopBar stageOn={stageOn} connected={connected} status={status} t0={t0} />
+      <TopBar stageOn={stageOn} connected={connected} status={status} health={backend.health} mock={backend.mock} t0={t0} />
 
       <main className="main">
         <aside className="col">
