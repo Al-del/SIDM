@@ -38,8 +38,8 @@ The UI's "Qwen reads from ẑ" panel shows what frozen Qwen decodes from the tra
 Open http://localhost:3000, type a question, press **Ask**, press **SPACE** when you've read
 each sentence (an epoch is capped at 9 s, the decoder's window).
 
-Requirements: the Python venv at `../../.venv` (torch, transformers; `pip install -r backend/requirements.txt`),
-Node 20+, and the trained model in the repository root (paths in `backend/config.py`,
+Requirements: the conda env from the repository root (`conda env create -f environment.yml`, which installs
+Python 3.12, Node and every Python package for the model and the app; `start.sh` uses it automatically), and the trained model in the repository root (paths in `backend/config.py`,
 overridable with `MOSAIC_DIR`, `BM_WORK`, `QWEN_MODEL`, `LLM_DEVICE`).
 
 ## How the EEG steers Qwen
@@ -62,9 +62,28 @@ deliberately subtle.
 * **REPLAY**: held-out ZuCo EEG (ZAB/ZJM/ZKW) streamed in real time. Real brain data, but recorded on
   *other* sentences, so the decoded units do not reflect what you read in the app.
 * **SYNTH**: generated signal for testing the pipeline. Not brain-derived.
-* **LSL**: a live headset over Lab Streaming Layer (`pip install pylsl`). Channels are matched by
-  label to the 105 EGI HydroCel channels the decoder was trained on; unmatched channels are zero.
-  A consumer 8–32 channel cap is far outside the training distribution.
+* **BA DIRECT**: a BrainAccess headset through the BrainAccess Python API, inside the backend. Needs the
+  backend on Linux (the SDK ships `libbacore.so` for Linux x86-64 and a DLL for Windows; there is no macOS build).
+* **LSL**: any EEG stream on Lab Streaming Layer. Channel labels may be HCGSN names (`E22`) or 10-05 names
+  (`Fp1`, `O1`, ...); they are placed with MNE montages and interpolated onto the 105 channels the decoder was
+  trained on (inverse angular distance, 3 nearest), after a causal 1–40 Hz band-pass and 50 Hz notch.
+
+### BrainAccess headset
+
+```bash
+# on the Linux machine paired with the headset (Bluetooth serial, e.g. /dev/rfcomm0)
+export BRAINACCESS_SDK=~/BrainAccessSDK-linux-classic      # folder with libbacore.so and bacore.json
+pip install numpy pylsl
+python backend/brainaccess_lsl_bridge.py --port /dev/rfcomm0
+#   custom cap: --cap '{"0":"Fp1","1":"Fp2","2":"O1","3":"O2"}'   gain: --gain 8
+```
+Then pick **LSL** in the app on the Mac (same network). If the backend itself runs on that Linux machine,
+pick **BA DIRECT** instead and set `BRAINACCESS_SDK`, `BRAINACCESS_PORT`, `BRAINACCESS_CAP`, `BRAINACCESS_GAIN`
+as needed. Default caps: MINI = F3 F4 C3 C4 P3 P4 O1 O2 (the SDK's default), HALO = Fp1 Fp2 O1 O2; any other
+model needs `BRAINACCESS_CAP`.
+
+A consumer headset with 4–32 channels is far outside the decoder's 105-channel training data; interpolation
+keeps the input shape right, not the information.
 
 The decoder's EEG-specific signal on new users is small, so treat steering from real EEG as a weak prior. Compare against the steering toggle off and
 against SYNTH before drawing conclusions.
