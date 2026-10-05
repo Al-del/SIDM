@@ -1,5 +1,7 @@
+import logging
 import os
 import sys
+import time
 from math import gcd
 
 import numpy as np
@@ -12,6 +14,8 @@ import config
 os.environ.setdefault("BM_ROOT", str(config.ROSEF))
 sys.path.insert(0, str(config.MOSAIC_CODE))
 from rag_mosaic import CFG, RAGMosaic, zscore
+
+log = logging.getLogger("neurosteer")
 
 
 def preprocess(x, fs):
@@ -26,6 +30,54 @@ def preprocess(x, fs):
     out = np.zeros((x.shape[0], T), dtype=np.float32)
     out[:, :n] = x
     return torch.from_numpy(out)[None], torch.tensor([n])
+
+
+def standardize(x, dim=-1):
+    return (x - x.mean(dim, keepdim=True)) / (x.std(dim, keepdim=True) + 1e-6)
+
+
+class TopicMatcher:
+
+    TASK = "Given a question, retrieve words that belong to its topic"
+
+    def __init__(self, assets, n_units):
+        from transformers import AutoModel, AutoTokenizer
+
+        self.dev = torch.device(config.TOPIC_DEVICE)
+        self.tok = AutoTokenizer.from_pretrained(config.TOPIC_MODEL, padding_side="left")
+        self.model = AutoModel.from_pretrained(config.TOPIC_MODEL, dtype=torch.float32).to(self.dev).eval()
+        self._last = (None, None)
+        cache = config.TOPIC_CACHE
+        if cache.exists():
+            ck = torch.load(cache, weights_only=False)
+            if ck["model"] == config.TOPIC_MODEL and ck["units"].shape[0] == n_units:
+                self.units = ck["units"]
+                return
+        t = time.time()
+        words = self._embed(list(assets["unit_texts"]))
+        idx = {w: i for i, w in enumerate(assets["vocab"])}
+        units = torch.zeros(n_units, words.shape[1])
+        for w, c in assets["word2cid"].items():
+            units[c] += words[idx[w]]
+        self.units = F.normalize(units, dim=-1)
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        torch.save({"model": config.TOPIC_MODEL, "units": self.units}, cache)
+        log.info("embedded %d bank units for topic matching in %.1f s", n_units, time.time() - t)
+
+    @torch.no_grad()
+    def _embed(self, texts, batch_size=64):
+        out = []
+        for i in range(0, len(texts), batch_size):
+            b = self.tok(texts[i:i + batch_size], padding=True, truncation=True, max_length=64,
+                         return_tensors="pt").to(self.dev)
+            out.append(F.normalize(self.model(**b).last_hidden_state[:, -1].float(), dim=-1).cpu())
+        return torch.cat(out)
+
+    def scores(self, question):
+        if self._last[0] != question:
+            q = self._embed([f"Instruct: {self.TASK}\nQuery:{question}"])[0]
+            self._last = (question, standardize(self.units @ q))
+        return self._last[1]
 
 
 class SemanticDecoder:
@@ -48,6 +100,17 @@ class SemanticDecoder:
         self.hub_mask = hub > torch.quantile(hub, 0.97)
         self.word2cid = a.get("word2cid", {})
         self.mu = float(sims.mean())
+        self.topic = None
+        try:
+            self.topic = TopicMatcher(a, self.bank.shape[0])
+        except Exception:
+            log.exception("topic matcher unavailable; decoding without topic re-ranking")
+
+    @torch.no_grad()
+    def topic_scores(self, question):
+        if self.topic is None or not question:
+            return None
+        return self.topic.scores(question).to(self.dev)
 
     def _ctx_empty(self):
         d = self.bank.shape[1]
@@ -97,7 +160,7 @@ class SemanticDecoder:
         return round(float((best * w).sum() / w.sum().clamp_min(1e-6)), 3)
 
     @torch.no_grad()
-    def decode(self, epoch, fs, top_units=12):
+    def decode(self, epoch, fs, top_units=12, question=None, topic_weight=0.0):
         x, L = preprocess(epoch, fs)
         x, L = x.to(self.dev), L.to(self.dev)
         z = F.normalize(self.model({"eeg": x, **self._ctx_empty()}, L)["sentence_embedding"], dim=-1)
@@ -109,21 +172,35 @@ class SemanticDecoder:
         pe = F.normalize(out["pred_embeddings"][0], dim=-1)
         cos = pe @ self.bank.T
         cos[:, self.hub_mask] = -1
+        topic = self.topic_scores(question) if topic_weight > 0 else None
+        rank = cos if topic is None else standardize(cos) + topic_weight * topic[None]
+        if topic is not None:
+            rank[:, self.hub_mask] = -float("inf")
         slots = []
         unit_score = {}
         for s in range(1, pe.shape[0]):
             if p_active[s] < 0.5:
                 continue
-            tv, ti = cos[s].topk(5)
-            cands = [{"unit": int(c), "words": self.members[int(c)], "cos": round(float(v), 4)}
-                     for v, c in zip(tv, ti)]
+            ti = rank[s].topk(5).indices
+            cands = [{"unit": int(c), "words": self.members[int(c)], "cos": round(float(cos[s, c]), 4)}
+                     for c in ti]
+            if topic is not None:
+                for d, c in zip(cands, ti):
+                    d["topic"] = round(float(topic[c]), 3)
             slots.append({"slot": s, "p_active": round(float(p_active[s]), 4), "candidates": cands})
-            for v, c in zip(tv, ti):
-                w = float(p_active[s]) * max(float(v), 0)
+            for r, c in enumerate(ti):
+                w = float(p_active[s]) * max(float(cos[s, c]), 0) * (1 - 0.1 * r)
                 unit_score[int(c)] = max(unit_score.get(int(c), 0), w)
         slots.sort(key=lambda d: -d["p_active"])
-        vecs = [{"word": s["candidates"][0]["words"][0], "p_active": s["p_active"],
-                 "vec": [round(v, 4) for v in pe[s["slot"]].tolist()]} for s in slots[:12]]
+        vecs, taken = [], set()
+        for s in slots[:12]:
+            v, best = pe[s["slot"]], s["candidates"][0]
+            if topic is not None:
+                best = next((c for c in s["candidates"] if c["unit"] not in taken), best)
+                taken.add(best["unit"])
+                v = F.normalize(v + self.bank[best["unit"]], dim=-1)
+            vecs.append({"word": best["words"][0], "p_active": s["p_active"],
+                         "vec": [round(x, 4) for x in v.tolist()]})
         ranked = sorted(unit_score.items(), key=lambda kv: -kv[1])[:top_units]
         units = [{"unit": c, "word": self.members[c][0], "words": self.members[c], "weight": round(w, 4)}
                  for c, w in ranked]
@@ -134,4 +211,7 @@ class SemanticDecoder:
             "z": [round(float(v), 4) for v in z[0].tolist()],
             "slot_vecs": vecs,
             "seconds": round(int(L) / config.FS, 2),
+            "topic": None if topic is None else {
+                "weight": topic_weight,
+                "nearest": [self.members[int(c)][0] for c in topic.masked_fill(self.hub_mask, -1e9).topk(8).indices]},
         }

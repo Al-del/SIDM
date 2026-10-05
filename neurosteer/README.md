@@ -85,6 +85,13 @@ each with its own slider:
 | **Logit bias** | output logits | additive boost on the units' first tokens; tokens it picked are underlined amber in the UI |
 | *Text hint* (off by default) | prompt text | lists the units explicitly; strongest but least "neural" |
 
+**Topic match** (`topic`, default 1.0, 0 = off): before the units are chosen, every decoder bank unit is scored
+against the question with Qwen3-Embedding-0.6B (question vs the unit's word glosses; the bank is ZuCo vocabulary,
+so exact word lookup would miss most question words). Each EEG slot then picks the units that are close to both
+the slot and the topic (both scores standardized, topic scaled by the slider), and the slot vectors are pulled
+toward the matched unit, so the prefix, residual Δh and logit bias all carry topic words. The bank embeddings are
+computed once (~70 s) and cached in `backend/weights/topic_units.pt` (env: `TOPIC_MODEL`, `TOPIC_DEVICE`).
+
 Calibrated on Qwen3-1.7B: residual ≤ 0.8 keeps grammar intact, ≥ 1.0 breaks it; the defaults are
 deliberately subtle.
 

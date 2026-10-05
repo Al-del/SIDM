@@ -20,10 +20,11 @@ acq = Acquisition()
 LABELS, POS = electrode_positions()
 DISPLAY = [int(i) for i in np.argsort(np.arctan2(POS[:, 1], POS[:, 0]))[:: max(1, len(POS) // 24)][:24]]
 BANDS = {"delta": (1, 4), "theta": (4, 8), "alpha": (8, 13), "beta": (13, 30), "gamma": (30, 45)}
-DEFAULTS = {"prefix": 0.8, "prefix_tokens": 6, "bias": 1.0, "residual": 0.3, "hint": False,
-            "temperature": 0.7, "max_tokens": 70, "max_sentences": 8}
-LIMITS = {"prefix": (0.0, 3.0), "prefix_tokens": (1, 12), "bias": (0.0, 5.0), "residual": (0.0, 2.0),
-          "temperature": (0.05, 2.0), "max_tokens": (8, 200), "max_sentences": (1, 20)}
+DEFAULTS = {"prefix": 0.8, "prefix_tokens": 6, "bias": 1.0, "residual": 0.3, "hint": False, "topic": 1.0,
+            "temperature": 0.7, "max_tokens": 70, "min_sentences": 4, "max_sentences": 8}
+LIMITS = {"prefix": (0.0, 3.0), "prefix_tokens": (1, 12), "bias": (0.0, 5.0), "residual": (0.0, 2.0), "topic": (0.0, 3.0),
+          "temperature": (0.05, 2.0), "max_tokens": (8, 200), "min_sentences": (1, 20),
+          "max_sentences": (1, 20)}
 MIN_EPOCH_S = 0.1
 PING_S = 15.0
 PRESETS = {
@@ -302,7 +303,8 @@ def decode_read():
     if epoch.shape[1] < src.fs * MIN_EPOCH_S:
         return jsonify({"error": f"epoch too short ({epoch.shape[1] / src.fs:.2f} s)"}), 400
     t = time.time()
-    d = models["decoder"].decode(epoch, src.fs)
+    d = models["decoder"].decode(epoch, src.fs, question=session["question"],
+                                 topic_weight=session["settings"]["topic"])
     hist = session["history"]
     read = hist[r["id"]]["sentence"] if 0 <= r["id"] < len(hist) else ""
     d.update({"start": r["start"], "end": end, "latency_ms": round((time.time() - t) * 1000),

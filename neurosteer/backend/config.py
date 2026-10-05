@@ -15,6 +15,9 @@ REPLAY_SUBJECTS = ["ZAB", "ZJM", "ZKW"]
 QWEN_MODEL = os.environ.get("QWEN_MODEL", "Qwen/Qwen3-1.7B")
 LLM_DEVICE = os.environ.get("LLM_DEVICE", "mps")
 DECODER_DEVICE = os.environ.get("DECODER_DEVICE", "cpu")
+TOPIC_MODEL = os.environ.get("TOPIC_MODEL", "Qwen/Qwen3-Embedding-0.6B")
+TOPIC_DEVICE = os.environ.get("TOPIC_DEVICE", LLM_DEVICE)
+TOPIC_CACHE = HERE / "weights" / "topic_units.pt"
 
 FS = 250
 N_CHANNELS = 105

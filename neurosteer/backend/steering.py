@@ -15,6 +15,8 @@ SYSTEM = ("You answer the user's question one sentence at a time. Each reply is 
           "markdown, never repeat an earlier sentence, never talk about these instructions or the context. "
           f"When the answer is complete, reply with exactly {END}")
 TRANSLATOR = Path(__file__).resolve().parent / "weights" / "translator.pt"
+SENT_END = re.compile(r"[.!?][\"')\]]?$")
+ABBREV = re.compile(r"(?:\b(?:e\.g|i\.e|etc|vs|cf|approx|Dr|Mr|Mrs|Ms|Fig|Eq)\.)$")
 
 
 class Steerer:
@@ -33,6 +35,7 @@ class Steerer:
         self.lock = threading.Lock()
         self._neutral = None
         self._neutral_frame = None
+        self._wordlike = {}
         self.T = self.frame = None
         if TRANSLATOR.exists():
             from translator import Frame, Translator
@@ -49,6 +52,16 @@ class Steerer:
 
     def _ids(self, text):
         return self.tok(text, add_special_tokens=False, return_tensors="pt").input_ids[0].to(self.dev)
+
+    def _is_word(self, t):
+        if t not in self._wordlike:
+            s = self.tok.decode([t]).strip()
+            self._wordlike[t] = len(s) > 1 and s.isalpha()
+        return self._wordlike[t]
+
+    def _end_ids(self):
+        a, b = self._ids(END).tolist(), self._ids(" " + END).tolist()
+        return {a[0], b[0]}, a[1]
 
     @torch.no_grad()
     def _word_vec(self, word):
@@ -165,7 +178,8 @@ class Steerer:
     @torch.no_grad()
     def generate(self, question, history, plan, s):
         with self.lock:
-            p_done = self.complete(question, history)
+            early = len(history) < s.get("min_sentences", 1)
+            p_done = 0.0 if early else self.complete(question, history)
             if p_done > 0.5:
                 yield {"done": True, "sentence": "", "end": True, "p_complete": round(p_done, 3)}
                 return
@@ -190,7 +204,8 @@ class Steerer:
             bias = plan["bias"] if plan is not None else {}
             bias_ids = torch.tensor(list(bias.keys()), device=self.dev, dtype=torch.long)
             bias_val = torch.tensor(list(bias.values()), device=self.dev)
-            n = 4
+            n = 6
+            topic = set(self._ids(question).tolist()) | set(self._ids(" " + question).tolist())
             seen, openings, used = {}, {}, set()
             for h in history:
                 hid = self._ids(h).tolist()
@@ -198,30 +213,39 @@ class Steerer:
                     seen.setdefault(tuple(hid[i:i + n - 1]), set()).add(hid[i + n - 1])
                 if len(hid) >= 2:
                     openings.setdefault(hid[0], set()).add(hid[1])
-                used.update(t for t in hid if len(self.tok.decode([t]).strip()) > 3)
+                used.update(t for t in hid if t not in topic and self._is_word(t) and len(self.tok.decode([t]).strip()) > 3)
             used = torch.tensor(sorted(used), device=self.dev, dtype=torch.long)
             try:
                 out = self.model(inputs_embeds=emb, use_cache=True)
                 past, logits = out.past_key_values, out.logits[0, -1].float()
-                ids, prev = [], ""
+                ids, prev, at_end = [], "", False
                 for _ in range(s["max_tokens"]):
                     for t in set(ids[-24:]):
-                        logits[t] = logits[t] / 1.15 if logits[t] > 0 else logits[t] * 1.15
+                        if self._is_word(t):
+                            logits[t] = logits[t] / 1.15 if logits[t] > 0 else logits[t] * 1.15
                     if len(bias_ids):
                         logits[bias_ids] += bias_val
                     if len(used):
-                        logits[used] -= 0.8
+                        logits[used] -= 0.5
+                    if early:
+                        opens, end_id = self._end_ids()
+                        if ids and ids[-1] in opens:
+                            logits[end_id] = -float("inf")
+                        if not ids:
+                            logits[[self.tok.eos_token_id, self.tok.convert_tokens_to_ids("<|im_end|>")]] = -float("inf")
                     if len(ids) == 1 and ids[0] in openings:
                         logits[list(openings[ids[0]])] = -float("inf")
                     if len(ids) >= n - 1:
-                        banned = seen.get(tuple(ids[-(n - 1):]))
+                        banned = [t for t in seen.get(tuple(ids[-(n - 1):]), ()) if self._is_word(t)]
                         if banned:
-                            logits[list(banned)] = -float("inf")
+                            logits[banned] = -float("inf")
                     probs = torch.softmax(logits / s["temperature"], -1)
                     sp, si = probs.sort(descending=True)
                     keep = sp.cumsum(0) - sp < 0.9
                     nxt = int(si[keep][torch.multinomial(sp[keep] / sp[keep].sum(), 1)])
                     if nxt in (self.tok.eos_token_id, self.tok.convert_tokens_to_ids("<|im_end|>")):
+                        break
+                    if at_end and self.tok.decode([nxt])[:1].isspace():
                         break
                     ids.append(nxt)
                     if len(ids) >= n:
@@ -230,8 +254,7 @@ class Steerer:
                     delta, prev = text[len(prev):], text
                     if delta:
                         yield {"text": delta, "steered": nxt in bias, "bias": round(bias.get(nxt, 0.0), 3)}
-                    if len(ids) > 3 and re.search(r"[.!?][\"')\]]?\s*$", text):
-                        break
+                    at_end = len(ids) > 3 and bool(SENT_END.search(text)) and not ABBREV.search(text)
                     out = self.model(input_ids=torch.tensor([[nxt]], device=self.dev), past_key_values=past,
                                      use_cache=True)
                     past, logits = out.past_key_values, out.logits[0, -1].float()
@@ -239,5 +262,5 @@ class Steerer:
                 if hook is not None:
                     hook.remove()
             sentence = self.tok.decode(ids, skip_special_tokens=True).strip()
-            yield {"done": True, "sentence": sentence, "end": sentence.startswith(END[:4]) or not sentence,
+            yield {"done": True, "sentence": sentence, "end": END[:4] in sentence or not sentence,
                    "p_complete": round(p_done, 3)}

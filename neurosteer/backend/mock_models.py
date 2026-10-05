@@ -50,7 +50,7 @@ class MockDecoder:
         tot = sum(bp.values()) or 1.0
         return {k: v / tot for k, v in bp.items()}
 
-    def decode(self, epoch, fs, top_units=12):
+    def decode(self, epoch, fs, top_units=12, question=None, topic_weight=0.0):
         n = int(np.asarray(epoch).shape[-1]) if np.asarray(epoch).ndim == 2 else 0
         bp = self.band_power(epoch, fs)
         rng = np.random.default_rng(seed_of(*(round(v, 2) for v in bp.values()), n // max(1, int(fs))))

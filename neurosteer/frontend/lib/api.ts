@@ -6,8 +6,10 @@ export type Settings = {
   bias: number;
   residual: number;
   hint: boolean;
+  topic: number;
   temperature: number;
   max_tokens: number;
+  min_sentences: number;
   max_sentences: number;
 };
 
@@ -21,7 +23,7 @@ export type Decode = {
   latency_ms: number;
   brain_derived: boolean;
   source: string;
-  
+  topic?: { weight: number; nearest: string[] } | null;
   alignment?: number | null;
 };
 

@@ -37,11 +37,13 @@ function cellColor(v: number) {
 }
 
 const SLIDERS: { key: keyof Settings; name: string; min: number; max: number; step: number; hint: string }[] = [
+  { key: "topic", name: "Topic match", min: 0, max: 3, step: 0.1, hint: "re-rank by question" },
   { key: "prefix", name: "Neural prefix", min: 0, max: 3, step: 0.1, hint: "post-embedding" },
   { key: "prefix_tokens", name: "Slot tokens", min: 0, max: 12, step: 1, hint: "translated slots" },
   { key: "residual", name: "Residual Δh", min: 0, max: 1.2, step: 0.05, hint: "layer activation" },
   { key: "bias", name: "Logit bias", min: 0, max: 8, step: 0.25, hint: "token boost" },
   { key: "temperature", name: "Temperature", min: 0.2, max: 1.4, step: 0.05, hint: "sampling" },
+  { key: "min_sentences", name: "Min sentences", min: 1, max: 12, step: 1, hint: "never ends earlier" },
   { key: "max_sentences", name: "Max sentences", min: 2, max: 16, step: 1, hint: "answer length" },
 ];
 
@@ -79,6 +81,11 @@ export default function SemanticPanel({ readout, decode, plan, settings, steer, 
             <span className="unit-w num">{u.weight.toFixed(2)}</span>
           </div>
         ))}
+        {decode?.topic && (
+          <p className="empty" style={{ marginTop: 10 }}>
+            Matched to the question&apos;s topic (×{decode.topic.weight.toFixed(1)}): <span className="mono">{decode.topic.nearest.join(" · ")}</span>
+          </p>
+        )}
       </div>
 
       <div className="section">
