@@ -103,7 +103,7 @@ export default function Page() {
     <div className="shell">
       <Boot status={status} mock={backend.mock} unreachable={backend.unreachable} hidden={ready} onHelp={() => setOverlay("help")} />
 
-      <TopBar stageOn={stageOn} connected={connected} status={status} health={backend.health} mock={backend.mock} t0={t0}>
+      <TopBar stageOn={stageOn} connected={connected} status={status} health={backend.health} mock={backend.mock} offline={backend.unreachable && !!status} t0={t0}>
         <div className="tools">
           <button className={`tool ${overlay === "help" ? "on" : ""}`} onClick={() => toggle("help")}
             aria-label="How it works" title="How it works (?)"><span className="long">HOW IT WORKS</span><span className="short">?</span></button>

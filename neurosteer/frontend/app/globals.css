@@ -142,6 +142,11 @@ input[type="range"]:focus-visible { outline-offset: 4px; }
 .dot.err { background: var(--alert); }
 @keyframes breathe { 50% { opacity: 0.45; } }
 @keyframes blink { 50% { opacity: 0.2; } }
+.offline-badge {
+  font-family: var(--font-mono), monospace; font-size: 9.5px; letter-spacing: 0.14em; color: var(--alert);
+  border: 1px solid rgba(255, 96, 88, 0.5); background: rgba(255, 96, 88, 0.08); padding: 4px 9px;
+  animation: blink 1.2s steps(2) infinite;
+}
 .dot.mock { background: var(--inject); box-shadow: 0 0 8px var(--inject); }
 .demo-badge {
   display: inline-flex; align-items: center; gap: 7px; margin-left: 6px;

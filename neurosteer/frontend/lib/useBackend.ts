@@ -21,6 +21,8 @@ export function useBackend(notify: Notify) {
   const montageRef = useRef(montage);
   montageRef.current = montage;
   const probed = useRef(false);
+  
+  const link = useRef(0);
   const pending = useRef<Partial<Settings>>({});
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -42,11 +44,18 @@ export function useBackend(notify: Notify) {
         if (!alive) return;
         setStatus(s);
         setUnreachable(false);
+        if (link.current === 2) notifyRef.current("ok", "Backend link restored");
+        link.current = 1;
         setSettings((cur) => cur ?? s.settings);
         if (!montageRef.current) get<Montage>("/api/montage").then((m) => alive && setMontage(m)).catch(() => {});
         if (!probed.current) probe();
       } catch {
-        if (alive) setUnreachable(true);
+        if (!alive) return;
+        setUnreachable(true);
+        if (link.current === 1) {
+          link.current = 2;
+          notifyRef.current("error", "Lost the link to the backend. Retrying…");
+        }
       }
     };
     poll();

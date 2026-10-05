@@ -11,13 +11,16 @@ type Props = {
   status: Status | null;
   health: Health | null | undefined;
   mock: boolean;
+  
+  offline: boolean;
   t0: number | null;
   children?: ReactNode;
 };
 
 const uptime = (s: number) => (s < 3600 ? `${Math.floor(s / 60)} min` : `${(s / 3600).toFixed(1)} h`);
 
-export default function TopBar({ stageOn, connected, status, health, mock, t0, children }: Props) {
+export default function TopBar({ stageOn, connected, status: live, health, mock, offline, t0, children }: Props) {
+  const status = offline ? null : live;
   const llm = status?.llm;
   return (
     <header className="topbar">
@@ -36,16 +39,17 @@ export default function TopBar({ stageOn, connected, status, health, mock, t0, c
         )}
       </div>
       <Pipeline on={stageOn} />
+      {offline && <span className="offline-badge" role="alert">NO BACKEND LINK</span>}
       <div className="links">
         <span className="link" title={connected ? "EEG stream connected" : "EEG stream offline"}>
           <span className={`dot ${connected ? "ok" : "err"}`} /><span className="link-name">EEG</span>
         </span>
         <span className="link" title={status?.errors.decoder ?? (status?.decoder ? "RAG-Mosaic decoder loaded" : "Decoder loading")}>
-          <span className={`dot ${status?.decoder ? "ok" : status?.errors.decoder ? "err" : "wait"}`} /><span className="link-name">DECODER</span>
+          <span className={`dot ${offline ? "err" : status?.decoder ? "ok" : status?.errors.decoder ? "err" : "wait"}`} /><span className="link-name">DECODER</span>
         </span>
         <span className="link"
           title={status?.errors.llm ?? (llm ? `${llm.name} · ${llm.layers} layers · steer L${llm.steer_layer} · ${llm.device}${llm.mock ? " · simulated" : ""}` : "LLM loading")}>
-          <span className={`dot ${llm ? (llm.mock ? "mock" : "ok") : status?.errors.llm ? "err" : "wait"}`} /><span className="link-name">QWEN</span>
+          <span className={`dot ${offline ? "err" : llm ? (llm.mock ? "mock" : "ok") : status?.errors.llm ? "err" : "wait"}`} /><span className="link-name">QWEN</span>
         </span>
         <Clock t0={t0} />
         {children}
