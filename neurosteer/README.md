@@ -38,6 +38,19 @@ The UI's "Qwen reads from ẑ" panel shows what frozen Qwen decodes from the tra
 Open http://localhost:3000, type a question, press **Ask**, press **SPACE** when you've read
 each sentence (an epoch is capped at 9 s, the decoder's window).
 
+### Demo mode (no weights)
+
+```bash
+./start.sh --mock                      # or: NEUROSTEER_MOCK=1 ./start.sh
+cd backend && python app.py --mock --port 5077   # backend only
+```
+A fake decoder (words picked from the epoch's band power) and a fake LLM (a canned, question-aware
+answer streamed word by word, 4–5 sentences, the decoded word woven in and marked steered) replace
+the models, so the whole loop runs on any laptop. `/api/status` reports `"mock": true`.
+`NEUROSTEER_MOCK_DELAY` sets the per-word delay (default 0.04 s).
+
+Tests run in mock mode: `cd backend && python -m pytest tests -q`.
+
 Requirements: the conda env from the repository root (`conda env create -f environment.yml`, which installs
 Python 3.12, Node and every Python package for the model and the app; `start.sh` uses it automatically), and the trained model in the repository root (paths in `backend/config.py`,
 overridable with `MOSAIC_DIR`, `BM_WORK`, `QWEN_MODEL`, `LLM_DEVICE`).
@@ -91,5 +104,33 @@ against SYNTH before drawing conclusions.
 ## Notes
 
 * On Apple Silicon, Qwen3 runs in float32: bfloat16 + SDPA on MPS produces garbage in torch 2.12.
-* API: `GET /api/eeg` (SSE stream), `POST /api/read/start|end`, `GET /api/generate` (SSE tokens),
-  `POST /api/session`, `POST /api/settings`, `POST /api/source`, `GET /api/status`, `GET /api/montage`.
+* Backend flags: `python app.py [--port 5050] [--host 127.0.0.1] [--mock]` (env: `PORT`, `HOST`, `NEUROSTEER_MOCK`).
+
+## API
+
+All endpoints return JSON; errors are `{"error": ..., "status": code}` with a matching HTTP status.
+SSE streams send a `: ping` comment every 15 s while idle.
+
+| endpoint | what |
+|---|---|
+| `GET /api/health` | `{"ok", "uptime_s", "version"}` |
+| `GET /api/status` | `mock`, EEG source, model info, load errors, settings, question, sentence count |
+| `GET /api/montage` | electrode labels/positions, displayed channels, headset sensors |
+| `POST /api/source` | `{"kind": "synthetic"\|"replay"\|"lsl"\|"brainaccess"}` |
+| `GET /api/eeg` | SSE: `eeg` frames and `metrics` (RMS, band power) |
+| `POST /api/session` | `{"question", "settings"?}` starts a new answer |
+| `POST /api/reset` | clears the session, keeps settings → `{"ok": true}` |
+| `POST /api/settings` | any subset of the settings, and/or `{"preset": name}`; values are type-checked and clamped |
+| `GET /api/presets` | `subtle`, `balanced`, `strong`, `off` (residual ≤ 0.8 in all) |
+| `GET /api/generate[?steer=0]` | SSE: `plan`, `token` (`text`, `steered`, `bias`), `done` (history entry); 409 while another generation runs |
+| `POST /api/read/start`, `POST /api/read/end` | record the epoch while reading; `end` decodes it → units, slots, neighbours, `alignment` |
+| `POST /api/readout` | what frozen Qwen reads from the translated ẑ |
+| `GET /api/compare` | SSE: next sentence steered then baseline (`token`/`done` with `lane`), then `summary` (`overlap`, `steered_words`); history is not changed |
+| `GET /api/history` | question and every sentence with its tokens, plan and decode |
+| `GET /api/stats` | `sentences`, `mean_alignment`, `mean_latency_ms` (generation), `mean_decode_ms`, `steered_tokens`, `total_tokens` |
+| `GET /api/export` | the session as a JSON download (`neurosteer-session-<timestamp>.json`) |
+
+**Alignment** (0–1) measures how well a decode's units match the sentence just read: with the real
+decoder, each unit's best cosine to the sentence's words in the decoder's text-embedding bank, rescaled
+so the bank's mean cosine is 0, weighted by unit weight; without embeddings, the weighted share of
+units whose word appears in the sentence.
