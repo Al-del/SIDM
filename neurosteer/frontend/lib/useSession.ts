@@ -24,7 +24,8 @@ export function useSession({ settings, onError, onSentence }: Options) {
   const [decode, setDecode] = useState<Decode | null>(null);
   const [plan, setPlan] = useState<Plan>(null);
   const [injecting, setInjecting] = useState(false);
-  const [readT, setReadT] = useState(0);
+  
+  const [readStartedAt, setReadStartedAt] = useState(0);
   const [steer, setSteer] = useState(true);
   const [auto, setAuto] = useState(true);
   const [t0, setT0] = useState<number | null>(null);
@@ -73,7 +74,7 @@ export function useSession({ settings, onError, onSentence }: Options) {
       return;
     }
     readStart.current = performance.now();
-    setReadT(0);
+    setReadStartedAt(readStart.current);
     go("reading");
   }, [go]);
 
@@ -119,15 +120,9 @@ export function useSession({ settings, onError, onSentence }: Options) {
 
   useEffect(() => {
     if (phase !== "reading") return;
-    let raf = 0;
-    const tick = () => {
-      const t = (performance.now() - readStart.current) / 1000;
-      setReadT(t);
-      if (t >= MAX_READ) { endReading(); return; }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    const left = MAX_READ * 1000 - (performance.now() - readStart.current);
+    const id = setTimeout(endReading, Math.max(0, left));
+    return () => clearTimeout(id);
   }, [phase, endReading]);
 
   useEffect(() => () => esRef.current?.close(), []);
@@ -183,7 +178,7 @@ export function useSession({ settings, onError, onSentence }: Options) {
   }, [go]);
 
   return {
-    phase, asked, readout, live, entries, decode, plan, injecting, readT, steer, auto, t0,
+    phase, asked, readout, live, entries, decode, plan, injecting, readStartedAt, steer, auto, t0,
     setSteer, setAuto, start, stop, next: generate, endReading, newSession, clear,
   };
 }

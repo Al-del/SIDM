@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { Entry } from "@/lib/api";
 import AlignmentMeter from "@/components/AlignmentMeter";
+import Tokens from "@/components/Tokens";
 
 function Legend() {
   return (
@@ -34,7 +35,7 @@ export default function Transcript({ entries }: { entries: Entry[] }) {
           <span className="tr-idx num" title={e.at != null ? time(e.at) : undefined}>{String(e.id + 1).padStart(2, "0")}</span>
           <div>
             <p className="tr-text">
-              {e.tokens.map((t, i) => <span key={i} className={t.steered ? "steer" : ""}>{t.text}</span>)}
+              <Tokens tokens={e.tokens} />
             </p>
             <div className="chips">
               {e.plan?.units.slice(0, 6).map((u) => <span key={"o" + u} className="chip out">→ {u}</span>)}

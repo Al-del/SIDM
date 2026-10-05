@@ -34,7 +34,7 @@ export default function Page() {
   const [statsTick, setStatsTick] = useState(0);
   const onSentence = useCallback(() => setStatsTick((t) => t + 1), []);
   const session = useSession({ settings, onError, onSentence });
-  const { phase, asked, readout, live, entries, decode, plan, injecting, readT, steer, auto, t0 } = session;
+  const { phase, asked, readout, live, entries, decode, plan, injecting, readStartedAt, steer, auto, t0 } = session;
   const { traces, metrics, connected, rate } = useEEG(montage?.display.length ?? 0);
   const { stats, remote } = useStats(statsTick, entries);
 
@@ -118,7 +118,7 @@ export default function Page() {
         </aside>
 
         <section className="col reader">
-          <Reader phase={phase} asked={asked} tokens={current} count={entries.length} injecting={injecting} readT={readT}
+          <Reader phase={phase} asked={asked} tokens={current} count={entries.length} injecting={injecting} readStartedAt={readStartedAt}
             translator={!!status?.llm?.translator} question={question} ready={ready}
             onQuestion={setQuestion} onStart={start} onNext={session.next} onNewSession={session.newSession} onStop={session.stop} />
           <div className="sessionbar">

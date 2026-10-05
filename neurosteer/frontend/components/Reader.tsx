@@ -1,5 +1,6 @@
 import type { Token } from "@/lib/api";
-import { MAX_READ } from "@/lib/useSession";
+import ReadRing from "@/components/ReadRing";
+import Tokens from "@/components/Tokens";
 import type { Phase } from "@/lib/useSession";
 
 type Props = {
@@ -8,7 +9,7 @@ type Props = {
   tokens: Token[];
   count: number;
   injecting: boolean;
-  readT: number;
+  readStartedAt: number;
   translator: boolean;
   question: string;
   ready: boolean;
@@ -64,18 +65,15 @@ export default function Reader(p: Props) {
         <>
           <p className="question"><b>Q</b><span>{p.asked}</span></p>
           <div className="sentence">
-            {tokens.map((t, i) => (
-              <span key={i} className={`tok ${t.steered ? "steer" : ""}`} title={t.steered ? `bias +${t.bias}` : undefined}>{t.text}</span>
-            ))}
+            <Tokens tokens={tokens} animate />
             {phase === "generating" && <span className="caret" />}
             {phase === "decoding" && <span className="scan" />}
           </div>
           <div className="timer">
             {phase === "reading" && (
               <>
-                <div className="timer-track"><div className="timer-fill" style={{ width: `${(p.readT / MAX_READ) * 100}%` }} /></div>
-                <span className="label num">{p.readT.toFixed(1)} / {MAX_READ}.0 s</span>
-                <span className="key">SPACE</span>
+                <ReadRing startedAt={p.readStartedAt} />
+                <span className="label">Reading · press <kbd className="key">SPACE</kbd> when done</span>
               </>
             )}
             {phase === "decoding" && <span className="label">Decoding epoch through RAG-Mosaic…</span>}

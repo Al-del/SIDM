@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
+import Tokens from "@/components/Tokens";
 import { API, streamErrorText } from "@/lib/api";
 import type { CompareDone, CompareLane, CompareSummary, CompareToken, Token } from "@/lib/api";
 
@@ -61,13 +62,7 @@ function Lane({ name, kind, tokens, ms, mark, streaming }: {
         <span className="label num">{ms != null ? `${ms} ms` : streaming ? "streaming" : ""}</span>
       </div>
       <p className="lane-text">
-        {tokens.map((t, i) => {
-          const only = mark && kind === "steered" && mark.has(norm(t.text));
-          return (
-            <span key={i} className={`tok ${t.steered ? "steer" : ""} ${only ? "only" : ""}`}
-              title={only ? "Only in the steered sentence" : t.steered ? `bias +${t.bias}` : undefined}>{t.text}</span>
-          );
-        })}
+        <Tokens tokens={tokens} animate highlight={mark && kind === "steered" ? (t) => mark.has(norm(t.text)) : undefined} />
         {streaming && <span className="caret" />}
         {!tokens.length && !streaming && <span className="empty">—</span>}
       </p>

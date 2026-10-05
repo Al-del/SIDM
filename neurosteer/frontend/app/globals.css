@@ -219,9 +219,20 @@ button, input { font: inherit; color: inherit; }
   font-size: clamp(22px, 2.3vw, 34px); line-height: 1.38; font-weight: 300; letter-spacing: -0.01em;
   max-width: 30em; position: relative;
 }
-.tok { animation: tokin 380ms var(--ease) both; white-space: pre-wrap; }
-@keyframes tokin { from { opacity: 0; filter: blur(6px); } to { opacity: 1; filter: blur(0); } }
-.tok.steer { color: #ffd59c; text-decoration: underline; text-decoration-color: var(--inject); text-underline-offset: 6px; text-decoration-thickness: 1px; }
+.tok { white-space: pre-wrap; }
+.tok.in { animation: tokin 520ms var(--ease) both; }
+@keyframes tokin {
+  0% { opacity: 0; filter: blur(7px); text-shadow: 0 0 18px rgba(127, 227, 255, 0.9); }
+  45% { opacity: 1; }
+  100% { opacity: 1; filter: blur(0); text-shadow: 0 0 0 transparent; }
+}
+.tok.steer { color: #ffd59c; text-decoration: underline; text-decoration-color: var(--inject); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+.tok.steer.in { animation: tokin-steer 900ms var(--ease) both; }
+@keyframes tokin-steer {
+  0% { opacity: 0; filter: blur(7px); text-shadow: 0 0 22px rgba(255, 176, 74, 1); }
+  35% { opacity: 1; text-shadow: 0 0 14px rgba(255, 176, 74, 0.8); }
+  100% { opacity: 1; filter: blur(0); text-shadow: 0 0 0 transparent; }
+}
 .caret { display: inline-block; width: 0.5em; height: 1em; background: var(--signal); vertical-align: -0.12em; margin-left: 2px; animation: blink 0.8s steps(2) infinite; }
 .scan { position: absolute; inset: -8px -12px; overflow: hidden; pointer-events: none; }
 .scan::after {
@@ -232,8 +243,23 @@ button, input { font: inherit; color: inherit; }
 }
 @keyframes scan { to { left: 100%; } }
 .timer { margin-top: 28px; display: flex; align-items: center; gap: 14px; }
-.timer-track { flex: 1; max-width: 420px; height: 1px; background: var(--line-2); position: relative; }
-.timer-fill { position: absolute; left: 0; top: -1px; height: 3px; background: var(--inject); box-shadow: 0 0 12px var(--inject); }
+.ring { position: relative; width: 44px; height: 44px; flex: 0 0 auto; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+.ring-track { fill: none; stroke: var(--line-2); stroke-width: 2; }
+.ring-fill {
+  fill: none; stroke: var(--inject); stroke-width: 2; stroke-linecap: butt;
+  filter: drop-shadow(0 0 4px rgba(255, 176, 74, 0.8));
+  animation: ring-fill linear both;
+}
+@keyframes ring-fill { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
+.ring-v { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--text); }
+.ring-sweep {
+  position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, rgba(255, 176, 74, 0.2), var(--inject)); box-shadow: 0 0 10px var(--inject);
+  animation: sweep linear both;
+}
+@keyframes sweep { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.timer kbd.key { color: var(--text); margin: 0 3px; }
 .key { border: 1px solid var(--line-3); padding: 2px 7px; font-family: var(--font-mono), monospace; font-size: 10px; letter-spacing: 0.1em; }
 
 .start { display: flex; flex-direction: column; gap: 22px; max-width: 640px; }
