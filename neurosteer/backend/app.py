@@ -11,7 +11,7 @@ from werkzeug.exceptions import HTTPException
 
 import config
 from eeg_source import SOURCES, Acquisition, electrode_positions
-from textutil import overlap_alignment
+from textutil import jaccard, only_in, overlap_alignment
 
 log = logging.getLogger("neurosteer")
 app = Flask(__name__)
@@ -422,6 +422,38 @@ def generate():
             log.info("sentence %d in %d ms (%d tokens, %d steered)%s", rec["id"], rec["ms"], len(tokens),
                      sum(t["steered"] for t in tokens), " [end]" if end else "")
             yield event("done", rec)
+
+    return exclusive(gen())
+
+
+@app.get("/api/compare")
+def compare():
+    llm = models["llm"]
+    if llm is None:
+        return jsonify({"error": "LLM not loaded"}), 503
+    if not session["question"]:
+        return jsonify({"error": "no session: POST /api/session first"}), 400
+    s, question, d = dict(session["settings"]), session["question"], session["last_decode"]
+    history = [h["sentence"] for h in session["history"]]
+
+    def gen():
+        out = {}
+        for lane in ("steered", "baseline"):
+            t0 = time.time()
+            plan = llm.plan(d, s) if d and lane == "steered" else None
+            sentence = ""
+            for item in llm.generate(question, history, plan, s):
+                if item.get("done"):
+                    sentence = item["sentence"] if not item["end"] else ""
+                else:
+                    yield event("token", {"lane": lane, "text": item["text"], "steered": item["steered"],
+                                          "bias": item["bias"]})
+            out[lane] = sentence
+            yield event("done", {"lane": lane, "sentence": sentence, "ms": round((time.time() - t0) * 1000)})
+        summary = {"overlap": jaccard(out["steered"], out["baseline"]),
+                   "steered_words": only_in(out["steered"], out["baseline"])}
+        log.info("compare: overlap %.2f, steered-only words %s", summary["overlap"], summary["steered_words"])
+        yield event("summary", summary)
 
     return exclusive(gen())
 
