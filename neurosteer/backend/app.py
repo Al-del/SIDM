@@ -419,6 +419,26 @@ def history():
     return jsonify({"question": session["question"], "history": session["history"]})
 
 
+def mean(xs):
+    xs = [x for x in xs if x is not None]
+    return round(sum(xs) / len(xs), 3) if xs else None
+
+
+def session_stats():
+    hist = list(session["history"])
+    decodes = [h["decode"] for h in hist if h.get("decode")]
+    tokens = [t for h in hist for t in h["tokens"]]
+    return {"sentences": len(hist), "mean_alignment": mean([d.get("alignment") for d in decodes]),
+            "mean_latency_ms": mean([h["ms"] for h in hist]),
+            "mean_decode_ms": mean([d.get("latency_ms") for d in decodes]),
+            "steered_tokens": sum(bool(t.get("steered")) for t in tokens), "total_tokens": len(tokens)}
+
+
+@app.get("/api/stats")
+def stats():
+    return jsonify(session_stats())
+
+
 def main():
     ap = argparse.ArgumentParser(description="Neurosteer backend")
     ap.add_argument("--port", type=int, default=config.PORT)
