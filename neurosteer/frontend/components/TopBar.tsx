@@ -31,21 +31,21 @@ export default function TopBar({ stageOn, connected, status, health, mock, t0, c
         {mock && (
           <span className="demo-badge" role="status"
             title="The backend is running simulated models: tokens and decodes are synthetic, for showing the interface only.">
-            <span className="demo-dot" />DEMO MODE · simulated models
+            <span className="demo-dot" />DEMO MODE<span className="demo-long">&nbsp;· simulated models</span>
           </span>
         )}
       </div>
       <Pipeline on={stageOn} />
       <div className="links">
         <span className="link" title={connected ? "EEG stream connected" : "EEG stream offline"}>
-          <span className={`dot ${connected ? "ok" : "err"}`} />EEG
+          <span className={`dot ${connected ? "ok" : "err"}`} /><span className="link-name">EEG</span>
         </span>
         <span className="link" title={status?.errors.decoder ?? (status?.decoder ? "RAG-Mosaic decoder loaded" : "Decoder loading")}>
-          <span className={`dot ${status?.decoder ? "ok" : status?.errors.decoder ? "err" : "wait"}`} />DECODER
+          <span className={`dot ${status?.decoder ? "ok" : status?.errors.decoder ? "err" : "wait"}`} /><span className="link-name">DECODER</span>
         </span>
         <span className="link"
           title={status?.errors.llm ?? (llm ? `${llm.name} · ${llm.layers} layers · steer L${llm.steer_layer} · ${llm.device}${llm.mock ? " · simulated" : ""}` : "LLM loading")}>
-          <span className={`dot ${llm ? (llm.mock ? "mock" : "ok") : status?.errors.llm ? "err" : "wait"}`} />QWEN
+          <span className={`dot ${llm ? (llm.mock ? "mock" : "ok") : status?.errors.llm ? "err" : "wait"}`} /><span className="link-name">QWEN</span>
         </span>
         <Clock t0={t0} />
         {children}

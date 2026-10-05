@@ -21,7 +21,7 @@ export default function LeftRail({ montage, metrics, reading, eeg, decode, switc
       <div className="section">
         <div className="section-head">
           <span className="label">Electrode array</span>
-          <span className="label num">{eeg?.channels ?? 105} CH · {eeg?.fs ?? 250} HZ</span>
+          <span className="label num">{eeg?.channels ?? 105} CH<span className="hz"> · {eeg?.fs ?? 250} HZ</span></span>
         </div>
         <ElectrodeArray montage={montage} metrics={metrics} reading={reading} sensors={montage?.sensors ?? []} />
         <div className="array-readout">

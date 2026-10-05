@@ -39,13 +39,14 @@ export default function Page() {
   const { stats, remote } = useStats(statsTick, entries);
 
   const [overlay, setOverlay] = useState<Overlay>(null);
+  const [sideOpen, setSideOpen] = useState(false);
   const toggle = (o: Exclude<Overlay, null>) => setOverlay((cur) => (cur === o ? null : o));
 
   useHotkeys({
     " ": phase === "reading" && session.endReading,
     k: () => toggle("keys"),
     "?": () => toggle("help"),
-    Escape: () => setOverlay(null),
+    Escape: () => { setOverlay(null); setSideOpen(false); },
     e: () => doExport(),
     c: () => (overlay === "compare" ? setOverlay(null) : openCompare()),
   });
@@ -104,14 +105,16 @@ export default function Page() {
       <TopBar stageOn={stageOn} connected={connected} status={status} health={backend.health} mock={backend.mock} t0={t0}>
         <div className="tools">
           <button className={`tool ${overlay === "help" ? "on" : ""}`} onClick={() => toggle("help")}
-            aria-label="How it works" title="How it works (?)">HOW IT WORKS</button>
+            aria-label="How it works" title="How it works (?)"><span className="long">HOW IT WORKS</span><span className="short">?</span></button>
+          <button className={`tool panel-toggle ${sideOpen ? "on" : ""}`} onClick={() => setSideOpen((o) => !o)}
+            aria-expanded={sideOpen} aria-controls="side-panel" title="Semantic panel and steering controls">PANEL</button>
           <button className={`tool ${overlay === "keys" ? "on" : ""}`} onClick={() => toggle("keys")}
             aria-expanded={overlay === "keys"} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (K)">KEYS</button>
           <ShortcutHint open={overlay === "keys"} onClose={() => setOverlay(null)} />
         </div>
       </TopBar>
 
-      <main className="main">
+      <main className={`main ${sideOpen ? "side-open" : ""}`}>
         <aside className="col">
           <LeftRail montage={montage} metrics={metrics} reading={phase === "reading"} eeg={eeg} decode={decode}
             switching={backend.switching} onSource={backend.setSource} />
@@ -129,7 +132,8 @@ export default function Page() {
           <Transcript entries={entries} />
         </section>
 
-        <aside className="col">
+        <div className="side-scrim" onClick={() => setSideOpen(false)} aria-hidden />
+        <aside className="col side" id="side-panel" aria-label="Semantic decode and steering">
           <SemanticPanel readout={readout} decode={decode} plan={plan} settings={settings} steer={steer} auto={auto}
             onSetting={backend.updateSetting} onSteer={session.setSteer} onAuto={session.setAuto}
             presets={backend.presets} onPreset={backend.applyPreset} />
