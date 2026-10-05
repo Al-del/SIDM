@@ -21,6 +21,8 @@ export type Decode = {
   latency_ms: number;
   brain_derived: boolean;
   source: string;
+  
+  alignment?: number;
 };
 
 export type Plan = {
@@ -52,15 +54,59 @@ export type Status = {
     headset_channels?: string[]; unknown_labels?: string[]; model?: string; battery?: number | null;
   };
   decoder: boolean;
-  llm: { name: string; layers: number; hidden: number; steer_layer: number; device: string; translator: boolean } | null;
+  llm: {
+    name: string; layers: number; hidden: number; steer_layer: number; device: string; translator: boolean; mock?: boolean;
+  } | null;
   loading: boolean;
   errors: Record<string, string>;
   settings: Settings;
+  
+  mock?: boolean;
 };
 
 export type Montage = {
   labels: string[]; pos: [number, number][]; display: number[]; display_labels: string[]; sensors: number[];
 };
+
+export type Health = { ok: boolean; uptime_s: number; version: string };
+
+export type Stats = {
+  sentences: number;
+  mean_alignment: number | null;
+  mean_latency_ms: number | null;
+  steered_tokens: number;
+  total_tokens: number;
+};
+
+export const PRESETS = ["subtle", "balanced", "strong", "off"] as const;
+export type PresetName = (typeof PRESETS)[number];
+export type Presets = Record<PresetName, Partial<Settings>>;
+
+export type CompareLane = "steered" | "baseline";
+export type CompareToken = Token & { lane: CompareLane };
+export type CompareDone = { lane: CompareLane; sentence: string; ms: number };
+export type CompareSummary = { overlap: number; steered_words: string[] };
+
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+async function parse<T>(r: Response): Promise<T> {
+  let data: unknown = null;
+  try {
+    data = await r.json();
+  } catch {
+    if (r.ok) throw new ApiError(`Malformed response from ${r.url}`, r.status);
+  }
+  if (!r.ok) {
+    const msg = (data as { error?: string } | null)?.error;
+    throw new ApiError(msg ?? `${r.status} ${r.statusText}`.trim(), r.status);
+  }
+  return data as T;
+}
 
 export async function post<T>(path: string, body: unknown = {}): Promise<T> {
   const r = await fetch(`${API}${path}`, {
@@ -68,12 +114,24 @@ export async function post<T>(path: string, body: unknown = {}): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error ?? r.statusText);
-  return data as T;
+  return parse<T>(r);
 }
 
 export async function get<T>(path: string): Promise<T> {
-  const r = await fetch(`${API}${path}`);
-  return (await r.json()) as T;
+  return parse<T>(await fetch(`${API}${path}`));
+}
+
+export async function getOptional<T>(path: string): Promise<T | null> {
+  try {
+    return await get<T>(path);
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 404 || e.status === 405)) return null;
+    throw e;
+  }
+}
+
+export function errorText(e: unknown): string {
+  if (e instanceof ApiError && e.status === 409) return "Qwen is already generating. Wait for it to finish.";
+  if (e instanceof TypeError) return `Backend unreachable at ${API}`;
+  return e instanceof Error ? e.message : String(e);
 }
