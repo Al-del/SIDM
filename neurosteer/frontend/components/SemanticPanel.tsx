@@ -1,6 +1,7 @@
 "use client";
 
-import type { Decode, Plan, Settings } from "@/lib/api";
+import { PRESETS } from "@/lib/api";
+import type { Decode, Plan, PresetName, Presets, Settings } from "@/lib/api";
 import AlignmentMeter from "@/components/AlignmentMeter";
 
 type Props = {
@@ -13,7 +14,22 @@ type Props = {
   onSetting: (k: keyof Settings, v: number | boolean) => void;
   onSteer: (v: boolean) => void;
   onAuto: (v: boolean) => void;
+  presets?: Presets | null;
+  onPreset?: (name: PresetName) => void;
 };
+
+function activePreset(presets: Presets, s: Settings): PresetName | null {
+  for (const name of PRESETS) {
+    const p = presets[name];
+    if (!p) continue;
+    const keys = Object.keys(p) as (keyof Settings)[];
+    if (keys.length && keys.every((k) => {
+      const a = p[k], b = s[k];
+      return typeof a === "number" && typeof b === "number" ? Math.abs(a - b) < 1e-6 : a === b;
+    })) return name;
+  }
+  return null;
+}
 
 function cellColor(v: number) {
   const a = Math.min(1, Math.abs(v)) * 0.95;
@@ -29,8 +45,9 @@ const SLIDERS: { key: keyof Settings; name: string; min: number; max: number; st
   { key: "max_sentences", name: "Max sentences", min: 2, max: 16, step: 1, hint: "answer length" },
 ];
 
-export default function SemanticPanel({ readout, decode, plan, settings, steer, auto, onSetting, onSteer, onAuto }: Props) {
+export default function SemanticPanel({ readout, decode, plan, settings, steer, auto, onSetting, onSteer, onAuto, presets, onPreset }: Props) {
   const maxW = decode?.units[0]?.weight || 1;
+  const preset = presets && settings ? activePreset(presets, settings) : null;
   return (
     <>
       <div className="section">
@@ -88,7 +105,20 @@ export default function SemanticPanel({ readout, decode, plan, settings, steer, 
       </div>
 
       <div className="section">
-        <div className="section-head"><span className="label">Steering</span></div>
+        <div className="section-head">
+          <span className="label">Steering</span>
+          {presets && <span className="label" style={{ color: preset ? "var(--inject)" : "var(--faint)" }}>{preset ?? "custom"}</span>}
+        </div>
+        {presets && onPreset && (
+          <div className="seg presets" role="radiogroup" aria-label="Steering preset">
+            {PRESETS.filter((n) => presets[n]).map((n) => (
+              <button key={n} role="radio" aria-checked={preset === n} className={preset === n ? "on" : ""}
+                onClick={() => onPreset(n)} title={Object.entries(presets[n]).map(([k, v]) => `${k} ${v}`).join(" · ")}>
+                {n.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="toggle" onClick={() => onSteer(!steer)} style={{ borderTop: 0 }}>
           <span className="label" style={{ color: "var(--text)" }}>Neural steering</span>
           <span className={`switch ${steer ? "on" : ""}`} />

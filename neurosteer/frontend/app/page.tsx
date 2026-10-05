@@ -87,7 +87,8 @@ export default function Page() {
 
         <aside className="col">
           <SemanticPanel readout={readout} decode={decode} plan={plan} settings={settings} steer={steer} auto={auto}
-            onSetting={backend.updateSetting} onSteer={session.setSteer} onAuto={session.setAuto} />
+            onSetting={backend.updateSetting} onSteer={session.setSteer} onAuto={session.setAuto}
+            presets={backend.presets} onPreset={backend.applyPreset} />
         </aside>
       </main>
 

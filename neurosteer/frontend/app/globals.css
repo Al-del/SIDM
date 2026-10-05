@@ -190,6 +190,8 @@ button, input { font: inherit; color: inherit; }
 .seg button + button { border-left: 1px solid var(--line-2); }
 .seg button:hover { color: var(--text); }
 .seg button.on { background: var(--text); color: #000; }
+.seg.presets { margin-bottom: 14px; }
+.seg.presets button.on { background: var(--inject); color: #000; }
 .seg button.busy { color: var(--inject); animation: blink 0.9s steps(2) infinite; }
 .seg button:disabled { cursor: wait; }
 .sensor { animation: breathe 2.4s ease-in-out infinite; }
