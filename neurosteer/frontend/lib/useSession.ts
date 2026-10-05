@@ -165,8 +165,24 @@ export function useSession({ settings, onError, onSentence }: Options) {
     go("idle");
   }, [go]);
 
+  
+  const clear = useCallback(() => {
+    esRef.current?.close();
+    esRef.current = null;
+    endRef.current = false;
+    setEntries([]);
+    setLive([]);
+    setDecode(null);
+    setPlan(null);
+    setReadout(null);
+    setInjecting(false);
+    setAsked("");
+    setT0(null);
+    go("idle");
+  }, [go]);
+
   return {
     phase, asked, readout, live, entries, decode, plan, injecting, readT, steer, auto, t0,
-    setSteer, setAuto, start, stop, next: generate, endReading, newSession,
+    setSteer, setAuto, start, stop, next: generate, endReading, newSession, clear,
   };
 }

@@ -261,6 +261,10 @@ button, input { font: inherit; color: inherit; }
   display: flex; align-items: stretch; justify-content: space-between; gap: 16px;
   border-bottom: 1px solid var(--line-2); padding: 0 20px 0 0; min-height: 58px;
 }
+.session-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.tool kbd { font-family: inherit; font-size: 8.5px; color: var(--faint); border: 1px solid var(--line-2); padding: 0 4px; margin-left: 5px; }
+.tool.accent { border-color: rgba(255, 176, 74, 0.45); color: var(--inject); }
+.tool.accent:hover:not(:disabled) { border-color: var(--inject); color: #ffd59c; background: var(--inject-soft); }
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); flex: 1; min-width: 0; }
 .kpi { display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 9px 18px; min-width: 0; position: relative; }
 .kpi + .kpi { border-left: 1px solid var(--line); }

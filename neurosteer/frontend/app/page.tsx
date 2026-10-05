@@ -12,7 +12,9 @@ import Toasts from "@/components/Toasts";
 import ShortcutHint from "@/components/ShortcutHint";
 import HowItWorks from "@/components/HowItWorks";
 import StatsStrip from "@/components/StatsStrip";
-import { API } from "@/lib/api";
+import SessionActions from "@/components/SessionActions";
+import { API, ApiError, errorText, post } from "@/lib/api";
+import { exportSession } from "@/lib/exportSession";
 import { useBackend } from "@/lib/useBackend";
 import { useSession } from "@/lib/useSession";
 import { useToasts } from "@/lib/useToasts";
@@ -43,9 +45,37 @@ export default function Page() {
     k: () => toggle("keys"),
     "?": () => toggle("help"),
     Escape: () => setOverlay(null),
+    e: () => doExport(),
   });
 
   const start = () => session.start(question);
+
+  const [exporting, setExporting] = useState(false);
+  const doExport = async () => {
+    if (exporting || !entries.length) return;
+    setExporting(true);
+    try {
+      const from = await exportSession({ question: asked, entries, settings });
+      notify("ok", from === "backend" ? "Session exported" : "Session exported from the browser copy (no /api/export)");
+    } catch (e) {
+      onError(errorText(e));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const doReset = async () => {
+    session.clear();
+    try {
+      await post("/api/reset");
+      notify("ok", "Session reset");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) notify("info", "Cleared locally; this backend has no /api/reset");
+      else onError(errorText(e));
+    }
+    backend.resync();
+    setStatsTick((t) => t + 1);
+  };
   const current = phase === "generating" ? live : entries[entries.length - 1]?.tokens ?? [];
   const stageOn = {
     READ: phase === "reading",
@@ -81,6 +111,7 @@ export default function Page() {
             onQuestion={setQuestion} onStart={start} onNext={session.next} onNewSession={session.newSession} onStop={session.stop} />
           <div className="sessionbar">
             <StatsStrip stats={stats} remote={remote} />
+            <SessionActions onExport={doExport} onReset={doReset} exporting={exporting} canExport={entries.length > 0} />
           </div>
           <Transcript entries={entries} />
         </section>
