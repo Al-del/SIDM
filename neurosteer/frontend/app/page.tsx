@@ -1,50 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import LeftRail from "@/components/LeftRail";
 import Raster from "@/components/Raster";
 import SemanticPanel from "@/components/SemanticPanel";
 import TopBar from "@/components/TopBar";
 import Boot from "@/components/Boot";
 import { API, get, post } from "@/lib/api";
-import type { Decode, Entry, Montage, Plan, Settings, Status, Token } from "@/lib/api";
+import type { Montage, Settings, Status } from "@/lib/api";
+import { MAX_READ, useSession } from "@/lib/useSession";
 import { useEEG } from "@/lib/useEEG";
-
-type Phase = "idle" | "generating" | "reading" | "decoding" | "ready" | "complete";
-const MAX_READ = 9;
 
 export default function Page() {
   const [status, setStatus] = useState<Status | null>(null);
   const [montage, setMontage] = useState<Montage | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [phase, setPhase] = useState<Phase>("idle");
   const [question, setQuestion] = useState("Why do we dream?");
-  const [asked, setAsked] = useState("");
-  const [readout, setReadout] = useState<string | null>(null);
-  const [live, setLive] = useState<Token[]>([]);
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [decode, setDecode] = useState<Decode | null>(null);
-  const [plan, setPlan] = useState<Plan>(null);
-  const [injecting, setInjecting] = useState(false);
-  const [readT, setReadT] = useState(0);
-  const [steer, setSteer] = useState(true);
-  const [auto, setAuto] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [t0, setT0] = useState<number | null>(null);
   const [switching, setSwitching] = useState<string | null>(null);
-
-  const phaseRef = useRef<Phase>("idle");
-  const autoRef = useRef(auto);
-  const steerRef = useRef(steer);
-  const readStart = useRef(0);
-  const esRef = useRef<EventSource | null>(null);
-  const endRef = useRef(false);
   const tailRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  autoRef.current = auto;
-  steerRef.current = steer;
 
-  const go = (p: Phase) => { phaseRef.current = p; setPhase(p); };
+  const session = useSession({ settings, onError: setError });
+  const { phase, asked, readout, live, entries, decode, plan, injecting, readT, steer, auto, t0 } = session;
   const { traces, metrics, connected, rate } = useEEG(montage?.display.length ?? 0);
 
   useEffect(() => {
@@ -63,104 +41,21 @@ export default function Page() {
     return () => { alive = false; clearInterval(id); };
   }, []);
 
-  const endReading = useCallback(async () => {
-    if (phaseRef.current !== "reading") return;
-    go("decoding");
-    try {
-      const d = await post<Decode>("/api/read/end");
-      setDecode(d);
-      setEntries((es) => es.map((e, i) => (i === es.length - 1 ? { ...e, decode: d } : e)));
-      if (endRef.current) go("complete");
-      else if (autoRef.current) generate();
-      else go("ready");
-    } catch (e) {
-      setError(String(e));
-      go("ready");
-    }
-  }, []);
-
-  const startReading = useCallback(async () => {
-    await post("/api/read/start");
-    readStart.current = performance.now();
-    setReadT(0);
-    go("reading");
-  }, []);
-
-  const generate = useCallback(() => {
-    esRef.current?.close();
-    go("generating");
-    setLive([]);
-    setPlan(null);
-    const es = new EventSource(`${API}/api/generate${steerRef.current ? "" : "?steer=0"}`);
-    esRef.current = es;
-    es.addEventListener("plan", (ev) => {
-      const p = JSON.parse((ev as MessageEvent).data) as Plan;
-      setPlan(p);
-      setInjecting(!!p);
-    });
-    es.addEventListener("token", (ev) => {
-      setInjecting(false);
-      const t = JSON.parse((ev as MessageEvent).data) as Token;
-      setLive((l) => [...l, t]);
-    });
-    es.addEventListener("done", (ev) => {
-      es.close();
-      const rec = JSON.parse((ev as MessageEvent).data) as Entry;
-      endRef.current = rec.end;
-      if (rec.decode === null) post<{ text: string | null }>("/api/readout").then((r) => setReadout(r.text)).catch(() => {});
-      if (!rec.sentence) { setLive([]); go("complete"); return; }
-      setEntries((e) => [...e, rec]);
-      startReading();
-    });
-    es.onerror = () => {
-      es.close();
-      if (phaseRef.current === "generating") { setError("Generation stream failed"); go("ready"); }
-    };
-  }, [startReading]);
-
   useEffect(() => {
     tailRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [entries.length]);
 
   useEffect(() => {
-    if (phase !== "reading") return;
-    let raf = 0;
-    const tick = () => {
-      const t = (performance.now() - readStart.current) / 1000;
-      setReadT(t);
-      if (t >= MAX_READ) { endReading(); return; }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [phase, endReading]);
-
-  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Space" && phaseRef.current === "reading") { e.preventDefault(); endReading(); }
+      if (e.code === "Space" && phase === "reading") { e.preventDefault(); session.endReading(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [endReading]);
+  }, [phase, session.endReading]);
 
-  const start = async () => {
+  const start = () => {
     setError(null);
-    await post("/api/session", { question, settings });
-    setAsked(question);
-    endRef.current = false;
-    setEntries([]);
-    setDecode(null);
-    setPlan(null);
-    setReadout(null);
-    setT0(Date.now());
-    generate();
-  };
-
-  const stop = () => {
-    esRef.current?.close();
-    setAuto(false);
-    if (phaseRef.current === "reading") endReading();
-    else if (phaseRef.current === "generating") go("ready");
+    session.start(question);
   };
 
   const onSetting = (k: keyof Settings, v: number | boolean) => {
@@ -254,17 +149,17 @@ export default function Page() {
                   {phase === "complete" && (
                     <div className="actions">
                       <span className="label" style={{ color: "var(--signal)" }}>Answer complete · {entries.length} sentences</span>
-                      <button className="btn primary" onClick={() => { setT0(null); go("idle"); }}>Ask another</button>
+                      <button className="btn primary" onClick={session.newSession}>Ask another</button>
                     </div>
                   )}
                   {phase === "ready" && (
                     <div className="actions">
-                      <button className="btn primary" onClick={generate}>Next sentence</button>
-                      <button className="btn ghost" onClick={() => { setT0(null); go("idle"); }}>New session</button>
+                      <button className="btn primary" onClick={session.next}>Next sentence</button>
+                      <button className="btn ghost" onClick={session.newSession}>New session</button>
                     </div>
                   )}
                   {(phase === "reading" || phase === "generating") && (
-                    <button className="btn ghost" style={{ marginLeft: "auto" }} onClick={stop}>Stop</button>
+                    <button className="btn ghost" style={{ marginLeft: "auto" }} onClick={session.stop}>Stop</button>
                   )}
                 </div>
                 {error && <p className="notice" style={{ maxWidth: 520 }}>{error}</p>}
@@ -295,7 +190,7 @@ export default function Page() {
 
         <aside className="col">
           <SemanticPanel readout={readout} decode={decode} plan={plan} settings={settings} steer={steer} auto={auto}
-            onSetting={onSetting} onSteer={setSteer} onAuto={setAuto} />
+            onSetting={onSetting} onSteer={session.setSteer} onAuto={session.setAuto} />
         </aside>
       </main>
 
