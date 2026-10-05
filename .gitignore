@@ -21,4 +21,3 @@ __pycache__/
 .next/
 next-env.d.ts
 *.tsbuildinfo
-.claude/worktrees/
