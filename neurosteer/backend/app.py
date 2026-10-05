@@ -11,6 +11,7 @@ from werkzeug.exceptions import HTTPException
 
 import config
 from eeg_source import SOURCES, Acquisition, electrode_positions
+from textutil import overlap_alignment
 
 log = logging.getLogger("neurosteer")
 app = Flask(__name__)
@@ -238,6 +239,18 @@ def presets():
     return jsonify(PRESETS)
 
 
+def alignment(decoder, units, sentence):
+    if not sentence or not units:
+        return None
+    a = None
+    if hasattr(decoder, "alignment"):
+        try:
+            a = decoder.alignment(units, sentence)
+        except Exception:
+            log.exception("embedding alignment failed")
+    return a if a is not None else overlap_alignment(units, sentence)
+
+
 @app.post("/api/read/start")
 def read_start():
     buf, src = acq.buffer, acq.source
@@ -274,14 +287,17 @@ def decode_read():
         return jsonify({"error": f"epoch too short ({epoch.shape[1] / src.fs:.2f} s)"}), 400
     t = time.time()
     d = models["decoder"].decode(epoch, src.fs)
+    hist = session["history"]
+    read = hist[r["id"]]["sentence"] if 0 <= r["id"] < len(hist) else ""
     d.update({"start": r["start"], "end": end, "latency_ms": round((time.time() - t) * 1000),
-              "brain_derived": src.brain_derived, "source": src.label})
+              "brain_derived": src.brain_derived, "source": src.label,
+              "alignment": alignment(models["decoder"], d["units"], read), "at": time.time()})
     session["last_decode"] = d
-    log.info("decode %.1f s epoch -> %d units in %d ms: %s", d["seconds"], len(d["units"]), d["latency_ms"],
-             " ".join(u["word"] for u in d["units"][:6]))
+    log.info("decode %.1f s epoch -> %d units in %d ms, alignment %s: %s", d["seconds"], len(d["units"]),
+             d["latency_ms"], d["alignment"], " ".join(u["word"] for u in d["units"][:6]))
     public = {k: v for k, v in d.items() if k != "slot_vecs"}
-    if 0 <= r["id"] < len(session["history"]):
-        session["history"][r["id"]]["decode"] = public
+    if read:
+        hist[r["id"]]["decode"] = public
     return jsonify(public)
 
 

@@ -85,6 +85,18 @@ class MockDecoder:
             "seconds": round(min(n / fs, config.EPOCH_SECONDS), 2) if fs else 0.0,
         }
 
+    def alignment(self, units, sentence):
+        from textutil import stem, stems
+
+        s = stems(sentence)
+        if not units or not s:
+            return None
+        score = 0.0
+        for u in units:
+            band = next((ws for ws in LEXICON.values() if u["word"] in ws), [])
+            score += u["weight"] * (1.0 if stem(u["word"]) in s else 0.4 if any(stem(w) in s for w in band) else 0.0)
+        return round(score / (sum(u["weight"] for u in units) or 1.0), 3)
+
     def info(self):
         return {"name": "mock-decoder (band power -> words)", "dim": self.dim, "mock": True}
 

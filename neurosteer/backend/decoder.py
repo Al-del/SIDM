@@ -46,6 +46,8 @@ class SemanticDecoder:
         sims = self.bank @ self.bank.T
         hub = sims.topk(50, dim=1).values[:, 1:].mean(1)
         self.hub_mask = hub > torch.quantile(hub, 0.97)
+        self.word2cid = a.get("word2cid", {})
+        self.mu = float(sims.mean())
 
     def _ctx_empty(self):
         d = self.bank.shape[1]
@@ -67,6 +69,28 @@ class SemanticDecoder:
             rank[0, o:o + len(c)] = r
             pad[0, o:o + len(c)] = False
         return {"ctx_emb": emb, "ctx_sim": sim, "ctx_rank": rank, "ctx_pad": pad}
+
+    def _cid(self, word):
+        from textutil import stem
+
+        s = stem(word)
+        for w in (word, s, s + "s", word + "s", s + "e"):
+            if w in self.word2cid:
+                return self.word2cid[w]
+        return None
+
+    @torch.no_grad()
+    def alignment(self, units, sentence):
+        from textutil import content_words
+
+        cids = {c for c in map(self._cid, content_words(sentence)) if c is not None}
+        if not units or not cids:
+            return None
+        u = self.bank[torch.tensor([x["unit"] for x in units], device=self.dev)]
+        best = (u @ self.bank[torch.tensor(sorted(cids), device=self.dev)].T).max(1).values
+        best = ((best - self.mu) / (1 - self.mu)).clamp(0, 1)
+        w = torch.tensor([x["weight"] for x in units], device=self.dev)
+        return round(float((best * w).sum() / w.sum().clamp_min(1e-6)), 3)
 
     @torch.no_grad()
     def decode(self, epoch, fs, top_units=12):
