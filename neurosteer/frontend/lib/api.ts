@@ -47,7 +47,10 @@ export type Entry = {
 };
 
 export type Status = {
-  eeg: { kind: string | null; label?: string; fs?: number; channels?: number; brain_derived?: boolean };
+  eeg: {
+    kind: string | null; label?: string; fs?: number; channels?: number; brain_derived?: boolean; live?: boolean;
+    headset_channels?: string[]; unknown_labels?: string[]; model?: string; battery?: number | null;
+  };
   decoder: boolean;
   llm: { name: string; layers: number; hidden: number; steer_layer: number; device: string; translator: boolean } | null;
   loading: boolean;
@@ -55,7 +58,9 @@ export type Status = {
   settings: Settings;
 };
 
-export type Montage = { labels: string[]; pos: [number, number][]; display: number[]; display_labels: string[] };
+export type Montage = {
+  labels: string[]; pos: [number, number][]; display: number[]; display_labels: string[]; sensors: number[];
+};
 
 export async function post<T>(path: string, body: unknown = {}): Promise<T> {
   const r = await fetch(`${API}${path}`, {

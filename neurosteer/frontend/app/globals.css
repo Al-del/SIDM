@@ -117,15 +117,19 @@ button, input { font: inherit; color: inherit; }
 .band-bar { width: 100%; background: var(--signal-soft); border-top: 1px solid var(--signal); transition: height 300ms var(--ease); }
 .band-name { font-family: var(--font-mono), monospace; font-size: 9px; letter-spacing: 0.1em; color: var(--dim); }
 
-.seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line-2); }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line-2); }
 .seg button {
   background: none; border: 0; padding: 8px 0; cursor: pointer;
-  font-family: var(--font-mono), monospace; font-size: 10px; letter-spacing: 0.14em; color: var(--dim);
+  font-family: var(--font-mono), monospace; font-size: 9px; letter-spacing: 0.1em; color: var(--dim);
   transition: background 200ms, color 200ms;
 }
 .seg button + button { border-left: 1px solid var(--line-2); }
 .seg button:hover { color: var(--text); }
 .seg button.on { background: var(--text); color: #000; }
+.seg button.busy { color: var(--inject); animation: blink 0.9s steps(2) infinite; }
+.seg button:disabled { cursor: wait; }
+.sensor { animation: breathe 2.4s ease-in-out infinite; }
+.sensor-label { font-family: var(--font-mono), monospace; font-size: 7px; fill: var(--inject); letter-spacing: 0.06em; }
 .notice {
   margin-top: 12px; padding: 10px 12px; border-left: 2px solid var(--inject);
   background: var(--inject-soft); font-size: 11.5px; line-height: 1.5; color: #f3d6ad;

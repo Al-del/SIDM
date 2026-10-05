@@ -7,8 +7,8 @@ import type { Metrics } from "@/lib/useEEG";
 const C = 150;
 const HEAD = 104;
 
-export default function ElectrodeArray({ montage, metrics, reading }: {
-  montage: Montage | null; metrics: Metrics | null; reading: boolean;
+export default function ElectrodeArray({ montage, metrics, reading, sensors }: {
+  montage: Montage | null; metrics: Metrics | null; reading: boolean; sensors: number[];
 }) {
   const geo = useMemo(() => {
     if (!montage) return null;
@@ -59,6 +59,15 @@ export default function ElectrodeArray({ montage, metrics, reading }: {
           fill="none" stroke="rgba(205,225,245,0.3)" />
         <line x1={C - HEAD} y1={C} x2={C + HEAD} y2={C} stroke="rgba(205,225,245,0.05)" />
         <line x1={C} y1={C - HEAD} x2={C} y2={C + HEAD} stroke="rgba(205,225,245,0.05)" />
+        {geo && sensors.map((i, j) => {
+          const [x, y] = geo.pts[i];
+          return (
+            <g key={`s${j}`}>
+              <circle cx={x} cy={y} r={7} fill="none" stroke="var(--inject)" strokeWidth={1} className="sensor" />
+              <text x={x} y={y - 10} textAnchor="middle" className="sensor-label">{montage?.display_labels[j]}</text>
+            </g>
+          );
+        })}
         {geo && geo.pts.map(([x, y], i) => {
           const v = level ? level[i] : 0;
           return (
