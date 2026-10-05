@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import LeftRail from "@/components/LeftRail";
 import Raster from "@/components/Raster";
 import SemanticPanel from "@/components/SemanticPanel";
@@ -9,11 +9,15 @@ import Boot from "@/components/Boot";
 import Reader from "@/components/Reader";
 import Transcript from "@/components/Transcript";
 import Toasts from "@/components/Toasts";
+import ShortcutHint from "@/components/ShortcutHint";
 import { API } from "@/lib/api";
 import { useBackend } from "@/lib/useBackend";
 import { useSession } from "@/lib/useSession";
 import { useToasts } from "@/lib/useToasts";
 import { useEEG } from "@/lib/useEEG";
+import { useHotkeys } from "@/lib/useHotkeys";
+
+type Overlay = "keys" | null;
 
 export default function Page() {
   const [question, setQuestion] = useState("Why do we dream?");
@@ -25,13 +29,14 @@ export default function Page() {
   const { phase, asked, readout, live, entries, decode, plan, injecting, readT, steer, auto, t0 } = session;
   const { traces, metrics, connected, rate } = useEEG(montage?.display.length ?? 0);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Space" && phase === "reading") { e.preventDefault(); session.endReading(); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [phase, session.endReading]);
+  const [overlay, setOverlay] = useState<Overlay>(null);
+  const toggle = (o: Exclude<Overlay, null>) => setOverlay((cur) => (cur === o ? null : o));
+
+  useHotkeys({
+    " ": phase === "reading" && session.endReading,
+    k: () => toggle("keys"),
+    Escape: () => setOverlay(null),
+  });
 
   const start = () => session.start(question);
   const current = phase === "generating" ? live : entries[entries.length - 1]?.tokens ?? [];
@@ -47,7 +52,13 @@ export default function Page() {
     <div className="shell">
       <Boot status={status} mock={backend.mock} error={backend.unreachable && !status ? `Backend unreachable at ${API}` : null} hidden={ready} />
 
-      <TopBar stageOn={stageOn} connected={connected} status={status} health={backend.health} mock={backend.mock} t0={t0} />
+      <TopBar stageOn={stageOn} connected={connected} status={status} health={backend.health} mock={backend.mock} t0={t0}>
+        <div className="tools">
+          <button className={`tool ${overlay === "keys" ? "on" : ""}`} onClick={() => toggle("keys")}
+            aria-expanded={overlay === "keys"} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (K)">KEYS</button>
+          <ShortcutHint open={overlay === "keys"} onClose={() => setOverlay(null)} />
+        </div>
+      </TopBar>
 
       <main className="main">
         <aside className="col">

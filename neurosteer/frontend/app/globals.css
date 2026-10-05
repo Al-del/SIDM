@@ -143,6 +143,26 @@ button, input { font: inherit; color: inherit; }
   color: var(--inject); white-space: nowrap;
 }
 .demo-dot { width: 5px; height: 5px; background: var(--inject); box-shadow: 0 0 6px var(--inject); animation: blink 1.4s steps(2) infinite; }
+.tools { display: flex; gap: 6px; position: relative; margin-left: 4px; }
+.tool {
+  background: none; border: 1px solid var(--line-2); padding: 5px 9px; cursor: pointer;
+  font-family: var(--font-mono), monospace; font-size: 9.5px; letter-spacing: 0.14em; color: var(--dim);
+  transition: color 160ms, border-color 160ms, background 160ms;
+}
+.tool:hover:not(:disabled) { color: var(--text); border-color: var(--line-3); }
+.tool.on { color: #000; background: var(--text); border-color: var(--text); }
+.tool:disabled { opacity: 0.35; cursor: not-allowed; }
+.tool.danger:hover:not(:disabled), .tool.danger.on { color: var(--alert); border-color: var(--alert); background: rgba(255, 96, 88, 0.08); }
+.popover-scrim { position: fixed; inset: 0; z-index: 30; }
+.popover {
+  position: absolute; top: calc(100% + 12px); right: 0; z-index: 31; width: 300px;
+  background: rgba(7, 9, 11, 0.97); border: 1px solid var(--line-2); padding: 14px 16px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6); animation: popin 220ms var(--ease) both;
+}
+@keyframes popin { from { opacity: 0; transform: translateY(-4px); } }
+.keys-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.keys-list > div { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 10px; }
+.keys-list dd { font-size: 12px; color: var(--dim); }
 .clock { color: var(--text); font-size: 11px; min-width: 64px; text-align: right; }
 
 .array-wrap { position: relative; aspect-ratio: 1; margin: 4px auto 0; width: 100%; max-width: 260px; }
