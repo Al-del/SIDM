@@ -4,6 +4,7 @@ import logging
 import queue
 import threading
 import time
+from datetime import datetime, timezone
 
 import numpy as np
 from flask import Flask, Response, jsonify, request, stream_with_context
@@ -105,6 +106,7 @@ def cors(resp):
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
     resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    resp.headers["Access-Control-Expose-Headers"] = "Content-Disposition"
     return resp
 
 
@@ -481,6 +483,29 @@ def session_stats():
 @app.get("/api/stats")
 def stats():
     return jsonify(session_stats())
+
+
+def iso(t):
+    return datetime.fromtimestamp(t, timezone.utc).isoformat(timespec="seconds") if t else None
+
+
+@app.get("/api/export")
+def export():
+    now, llm, dec = time.time(), models["llm"], models["decoder"]
+    hist = []
+    for h in session["history"]:
+        d = h.get("decode")
+        hist.append({**h, "at": iso(h.get("at")),
+                     "decode": {**{k: v for k, v in d.items() if k not in ("z", "slot_vecs")}, "at": iso(d.get("at"))}
+                     if d else None})
+    body = {"version": config.VERSION, "exported_at": iso(now), "started_at": iso(session["created"]),
+            "question": session["question"], "settings": session["settings"], "ended": session["ended"],
+            "history": hist, "stats": session_stats(), "source": acq.status(),
+            "model": {"mock": models["mock"], "llm": llm.info() if llm else None,
+                      "decoder": dec.info() if hasattr(dec, "info") else dec is not None, "errors": models["errors"]}}
+    name = f"neurosteer-session-{datetime.fromtimestamp(now).strftime('%Y%m%d-%H%M%S')}.json"
+    return Response(json.dumps(body, indent=2), mimetype="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 def main():

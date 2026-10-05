@@ -70,6 +70,10 @@ class SemanticDecoder:
             pad[0, o:o + len(c)] = False
         return {"ctx_emb": emb, "ctx_sim": sim, "ctx_rank": rank, "ctx_pad": pad}
 
+    def info(self):
+        return {"name": config.MOSAIC_WEIGHTS.name, "units": int(self.bank.shape[0]), "dim": int(self.bank.shape[1]),
+                "neighbours": self.k, "device": str(self.dev)}
+
     def _cid(self, word):
         from textutil import stem
 
