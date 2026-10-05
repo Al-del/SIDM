@@ -402,6 +402,9 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 14px; background: va
 .raster-labels { display: flex; flex-direction: column; justify-content: space-around; padding: 0 0 0 14px; }
 .raster-labels span { font-family: var(--font-mono), monospace; font-size: 8.5px; color: var(--faint); line-height: 1; }
 .raster-side { border-left: 1px solid var(--line-2); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.raster::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(127, 227, 255, 0.25), transparent); }
+.live-dot { display: inline-block; width: 5px; height: 5px; margin-right: 6px; vertical-align: 1px; background: var(--faint); }
+.live-dot.on { background: var(--signal); box-shadow: 0 0 6px var(--signal); animation: breathe 1.2s ease-in-out infinite; }
 
 .boot {
   position: fixed; inset: 0; z-index: 50; background: var(--bg);
