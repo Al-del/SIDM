@@ -34,7 +34,7 @@ PRESETS = {
 
 models = {"decoder": None, "llm": None, "errors": {}, "loading": True, "mock": config.MOCK}
 session = {"question": "", "history": [], "settings": dict(DEFAULTS), "read": None, "last_decode": None, "ended": False,
-           "sid": 0}
+           "sid": 0, "created": time.time()}
 slock = threading.Lock()
 glock = threading.Lock()
 dlock = threading.Lock()
@@ -216,11 +216,23 @@ def eeg_stream():
 def new_session():
     body = jbody()
     with slock:
-        q = str(body.get("question") or body.get("topic") or "").strip()[:500] or "Why do we dream?"
-        session.update({"question": q, "history": [], "read": None, "last_decode": None, "ended": False,
-                        "sid": session["sid"] + 1})
+        clear_session(str(body.get("question") or body.get("topic") or "").strip()[:500] or "Why do we dream?")
         session["settings"].update(clean_settings(body.get("settings")))
     return jsonify({"question": session["question"], "settings": session["settings"]})
+
+
+def clear_session(question=""):
+    if session["read"] is not None:
+        session["read"]["src"].reading = False
+    session.update({"question": question, "history": [], "read": None, "last_decode": None, "ended": False,
+                    "sid": session["sid"] + 1, "created": time.time()})
+
+
+@app.post("/api/reset")
+def reset():
+    with slock:
+        clear_session()
+    return jsonify({"ok": True})
 
 
 @app.post("/api/settings")
