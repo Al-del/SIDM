@@ -57,7 +57,7 @@ export default function Page() {
       <TopBar stageOn={stageOn} connected={connected} status={status} health={backend.health} mock={backend.mock} t0={t0}>
         <div className="tools">
           <button className={`tool ${overlay === "help" ? "on" : ""}`} onClick={() => toggle("help")}
-            aria-label="How it works" title="How it works (?)">? HOW IT WORKS</button>
+            aria-label="How it works" title="How it works (?)">HOW IT WORKS</button>
           <button className={`tool ${overlay === "keys" ? "on" : ""}`} onClick={() => toggle("keys")}
             aria-expanded={overlay === "keys"} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (K)">KEYS</button>
           <ShortcutHint open={overlay === "keys"} onClose={() => setOverlay(null)} />

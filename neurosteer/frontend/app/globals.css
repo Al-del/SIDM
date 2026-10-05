@@ -65,11 +65,11 @@ button, input { font: inherit; color: inherit; }
 .section-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
 
 .topbar {
-  display: flex; align-items: center; gap: 28px;
-  padding: 0 20px;
+  display: flex; align-items: center; gap: 24px;
+  padding: 0 20px; white-space: nowrap; min-width: 0;
   position: relative; z-index: 2;
 }
-.brand { display: flex; align-items: center; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
 .brand-name { font-weight: 600; letter-spacing: 0.32em; font-size: 12px; }
 .brand-sub { color: var(--faint); font-size: 11px; letter-spacing: 0.12em; }
 .pipeline { display: flex; align-items: center; gap: 0; margin: 0 auto; position: relative; padding-bottom: 4px; }
@@ -127,7 +127,7 @@ button, input { font: inherit; color: inherit; }
   animation: loopback 1.6s linear infinite;
 }
 @keyframes loopback { from { background-position: 120% 100%; } to { background-position: -20% 100%; } }
-.links { display: flex; gap: 18px; align-items: center; }
+.links { display: flex; gap: 16px; align-items: center; flex: 0 0 auto; }
 .link { display: flex; align-items: center; gap: 7px; font-family: var(--font-mono), monospace; font-size: 10px; letter-spacing: 0.14em; color: var(--dim); }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
 .dot.ok { background: var(--signal); box-shadow: 0 0 8px var(--signal); animation: breathe 2.4s ease-in-out infinite; }
@@ -145,6 +145,7 @@ button, input { font: inherit; color: inherit; }
 .demo-dot { width: 5px; height: 5px; background: var(--inject); box-shadow: 0 0 6px var(--inject); animation: blink 1.4s steps(2) infinite; }
 .tools { display: flex; gap: 6px; position: relative; margin-left: 4px; }
 .tool {
+  white-space: nowrap; flex: 0 0 auto;
   background: none; border: 1px solid var(--line-2); padding: 5px 9px; cursor: pointer;
   font-family: var(--font-mono), monospace; font-size: 9.5px; letter-spacing: 0.14em; color: var(--dim);
   transition: color 160ms, border-color 160ms, background 160ms;
@@ -389,6 +390,14 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 14px; background: va
 .toast-x:hover { color: var(--text); }
 @keyframes toastin { from { opacity: 0; transform: translateX(16px); } }
 
+@media (max-width: 1640px) {
+  .brand-sub { display: none; }
+}
+@media (max-width: 1360px) {
+  .stage-sub { display: none; }
+  .wire { width: 28px; }
+  .links { gap: 12px; }
+}
 @media (max-width: 1180px) {
   body { overflow: auto; }
   .shell { height: auto; min-height: 100vh; grid-template-rows: auto auto 210px; }
